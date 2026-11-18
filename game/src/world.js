@@ -355,7 +355,7 @@ function buildStreetlight(bd, x, z, faceZ) {
   bd.setMat(MAT.PLAIN).setColor(0.12, 0.12, 0.14);
   bd.box(x - 0.28, 4.78, z + armZ - 0.25, x + 0.28, 4.95, z + armZ + 0.25);
   bd.setMat(MAT.EMIT).setColor(1.0, 0.75, 0.40);
-  bd.disc([x, 4.77, z + armZ], [0, -1, 0], 0.2, 10);
+  bd.disc([x, 4.77, z + armZ], [0, -1, 0], 0.28, 10);
 }
 
 // --- traffic lights ------------------------------------------------------------
@@ -798,6 +798,148 @@ function buildBikeRack(bd, x, z, yaw) {
   bd.pop();
 }
 
+// --- roadside props (GTA-like street furniture) --------------------------------
+// Every builder faces local +Z at yaw 0 (like buildBench): avenue props on
+// the east sidewalk use yaw -PI/2 (face west, toward the road), street
+// props on the south sidewalk use yaw PI (face north). Small props get no
+// collider (like the hydrants); the big ones (newsstand, cart, bus stop)
+// get one at the placement site.
+
+// Parking meter: post + head + a green "time left" dot.
+function buildParkingMeter(bd, x, z, yaw) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.METAL).setColor(0.30, 0.32, 0.30);
+  bd.tube([0, 0.05, 0], [0, 0.85, 0], 0.04, 0.035, 6, true);
+  bd.setColor(0.45, 0.50, 0.45);
+  bd.box(-0.09, 0.85, -0.06, 0.09, 1.10, 0.06);
+  bd.setMat(MAT.EMIT).setColor(0.30, 1.0, 0.35);
+  bd.disc([0, 1.02, 0.065], [0, 0, 1], 0.04, 8);
+  bd.pop();
+}
+
+// Bus stop: shelter (posts + roof + back panel + bench) + a blue sign blade
+// with a white disc. Footprint 2.5 x 0.9 — needs a collider.
+function buildBusStop(bd, x, z, yaw) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.METAL).setColor(0.25, 0.25, 0.27);
+  bd.box(-1.10, 0.05, -0.35, -1.00, 2.30, -0.25);
+  bd.box(1.00, 0.05, -0.35, 1.10, 2.30, -0.25);
+  bd.setMat(MAT.PLAIN).setColor(0.20, 0.25, 0.35);
+  bd.box(-1.25, 2.30, -0.45, 1.25, 2.38, 0.45); // roof
+  bd.setColor(0.65, 0.75, 0.85);
+  bd.box(-1.10, 0.90, -0.38, 1.10, 2.30, -0.32); // back panel
+  bd.setColor(0.45, 0.32, 0.20);
+  bd.box(-0.90, 0.45, -0.25, 0.90, 0.55, 0.15); // bench seat
+  bd.setMat(MAT.METAL).setColor(0.25, 0.25, 0.27);
+  bd.box(-0.80, 0.05, -0.20, -0.70, 0.45, 0.10);
+  bd.box(0.70, 0.05, -0.20, 0.80, 0.45, 0.10);
+  bd.tube([1.35, 0.05, 0.20], [1.35, 2.60, 0.20], 0.04, 0.04, 6, true);
+  bd.setMat(MAT.PLAIN).setColor(0.15, 0.35, 0.75);
+  bd.box(1.15, 2.30, 0.12, 1.55, 2.60, 0.28); // sign blade
+  bd.setColor(0.95, 0.95, 0.95);
+  bd.disc([1.35, 2.45, 0.29], [0, 0, 1], 0.09, 10);
+  bd.pop();
+}
+
+// Street-name sign: pole + two crossed green blades (reads from any angle).
+function buildStreetSign(bd, x, z, yaw) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.METAL).setColor(0.35, 0.35, 0.37);
+  bd.tube([0, 0.05, 0], [0, 2.60, 0], 0.05, 0.045, 6, true);
+  bd.setMat(MAT.PLAIN).setColor(0.15, 0.45, 0.25);
+  bd.box(-0.55, 2.35, -0.03, 0.55, 2.60, 0.03);
+  bd.box(-0.03, 2.05, -0.45, 0.03, 2.30, 0.45);
+  bd.pop();
+}
+
+// Newsstand: kiosk + red roof + colourful magazine fronts + a lit strip
+// under the roof. Footprint 1.6 x 1.2 — needs a collider.
+function buildNewsstand(bd, x, z, yaw) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.PLAIN).setColor(0.92, 0.88, 0.78);
+  bd.box(-0.80, 0.05, -0.60, 0.80, 1.10, 0.60);
+  bd.setColor(0.45, 0.32, 0.20);
+  bd.box(-0.85, 1.10, -0.65, 0.85, 1.16, 0.65); // counter
+  bd.setMat(MAT.METAL).setColor(0.25, 0.25, 0.27);
+  for (const sx of [-0.78, 0.78]) for (const sz of [-0.58, 0.58]) {
+    bd.box(sx - 0.04, 1.16, sz - 0.04, sx + 0.04, 2.10, sz + 0.04);
+  }
+  bd.setMat(MAT.PLAIN).setColor(0.85, 0.20, 0.15);
+  bd.box(-0.95, 2.10, -0.75, 0.95, 2.20, 0.75); // roof
+  // Magazine fronts (bright quads on the +z face).
+  const magCols = [[0.95, 0.25, 0.20], [0.20, 0.50, 0.90], [1.0, 0.80, 0.20], [0.25, 0.75, 0.40]];
+  magCols.forEach((c, i) => {
+    const mx = -0.60 + i * 0.40;
+    bd.setColor(c[0], c[1], c[2]);
+    bd.quad([mx - 0.16, 0.60, 0.61], [mx + 0.16, 0.60, 0.61], [mx + 0.16, 1.00, 0.61], [mx - 0.16, 1.00, 0.61]);
+  });
+  bd.setMat(MAT.EMIT).setColor(1.0, 0.85, 0.50);
+  bd.box(-0.85, 2.02, 0.60, 0.85, 2.10, 0.68); // lit strip
+  bd.pop();
+}
+
+// Street-vendor cart: body + wheels + striped canopy + a glowing bulb.
+// Footprint 1.4 x 0.9 — needs a collider.
+function buildVendorCart(bd, x, z, yaw, seed) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.PLAIN).setColor(0.90, 0.55, 0.20);
+  bd.box(-0.70, 0.45, -0.45, 0.70, 0.95, 0.45); // body
+  bd.setMat(MAT.PLAIN).setColor(0.10, 0.10, 0.12);
+  bd.disc([-0.72, 0.28, 0], [-1, 0, 0], 0.28, 10);
+  bd.disc([0.72, 0.28, 0], [1, 0, 0], 0.28, 10);
+  bd.setMat(MAT.METAL).setColor(0.30, 0.30, 0.32);
+  bd.box(-0.65, 0.05, -0.40, -0.55, 0.45, -0.30);
+  bd.box(0.55, 0.05, -0.40, 0.65, 0.45, -0.30);
+  for (const sx of [-0.65, 0.65]) for (const sz of [-0.40, 0.40]) {
+    bd.tube([sx, 0.95, sz], [sx, 1.90, sz], 0.03, 0.03, 5, true);
+  }
+  bd.setMat(MAT.PLAIN).setColor(0.95, 0.45, 0.15);
+  bd.box(-0.80, 1.90, -0.55, 0.80, 1.98, 0.55); // canopy
+  bd.setColor(0.95, 0.95, 0.95);
+  bd.box(-0.80, 1.90, -0.12, 0.80, 1.99, 0.12); // white stripe
+  // Goods on the counter: fruit boxes.
+  bd.setColor(0.95, 0.25, 0.20);
+  bd.box(-0.55, 0.95, -0.20, -0.15, 1.12, 0.20);
+  bd.setColor(1.0, 0.80, 0.20);
+  bd.box(-0.05, 0.95, -0.20, 0.35, 1.12, 0.20);
+  bd.setColor(0.25, 0.75, 0.40);
+  bd.box(0.40, 0.95, -0.20, 0.60, 1.12, 0.20);
+  bd.setMat(MAT.EMIT).setColor(1.0, 0.85, 0.45);
+  bd.blob(0, 1.80, 0, 0.07, 0.09, 0.07, seed || 1); // hanging bulb
+  bd.pop();
+}
+
+// Road-work barrier: sawhorse with an orange/white striped plank.
+function buildBarrier(bd, x, z, yaw) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.METAL).setColor(0.30, 0.30, 0.32);
+  bd.box(-0.75, 0.05, -0.15, -0.65, 0.70, 0.15);
+  bd.box(0.65, 0.05, -0.15, 0.75, 0.70, 0.15);
+  bd.box(-0.85, 0.02, -0.25, -0.55, 0.08, 0.25);
+  bd.box(0.55, 0.02, -0.25, 0.85, 0.08, 0.25);
+  const stripeCols = [[0.95, 0.45, 0.10], [0.95, 0.95, 0.95], [0.95, 0.45, 0.10], [0.95, 0.95, 0.95]];
+  stripeCols.forEach((c, i) => {
+    const sx0 = -0.85 + i * 0.425;
+    bd.setMat(MAT.PLAIN).setColor(c[0], c[1], c[2]);
+    bd.box(sx0, 0.70, -0.06, sx0 + 0.425, 0.95, 0.06);
+  });
+  bd.pop();
+}
+
+// Mailbox: post + blue box + domed top + slot.
+function buildMailbox(bd, x, z, yaw) {
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.METAL).setColor(0.25, 0.25, 0.27);
+  bd.box(-0.06, 0.05, -0.06, 0.06, 0.50, 0.06);
+  bd.setMat(MAT.PAINT).setColor(0.15, 0.30, 0.65);
+  bd.box(-0.25, 0.50, -0.18, 0.25, 1.00, 0.18);
+  bd.blob(0, 1.02, 0, 0.25, 0.12, 0.18, x * 3 + z);
+  bd.setMat(MAT.PLAIN).setColor(0.08, 0.08, 0.10);
+  bd.box(-0.15, 0.85, 0.18, 0.15, 0.90, 0.20);
+  bd.pop();
+}
+
+
 function buildTrashCan(bd, x, z) {
   bd.setMat(MAT.METAL).setColor(0.30, 0.45, 0.35);
   bd.tube([x, 0.05, z], [x, 0.85, z], 0.30, 0.26, 10, true);
@@ -843,7 +985,7 @@ function buildStringLights(bd, x0, z0, x1, z1) {
 // so the minimap + full map draw it as green.
 export const PARK = { x0: 30, x1: 54, z0: 57, z1: 93, name: 'Rambla Park' };
 
-function buildPark(bd) {
+function buildPark(bd, poolBd) {
   // Grass + paths (light strips + a plaza disc around the fountain).
   bd.setMat(MAT.PLAIN).setSeed(0).setColor(0.22, 0.48, 0.22);
   bd.quad([PARK.x0, 0.04, PARK.z0], [PARK.x1, 0.04, PARK.z0], [PARK.x1, 0.04, PARK.z1], [PARK.x0, 0.04, PARK.z1]);
@@ -895,6 +1037,12 @@ function buildPark(bd) {
   buildStreetlight(bd, 32, 76, true);
   buildStreetlight(bd, 52, 76, true);
   buildStreetlight(bd, 42, 60, false);
+  if (poolBd) {
+    poolBd.setMat(MAT.EMIT).setColor(1.0, 0.72, 0.35);
+    poolBd.disc([32, 0.17, 74.7], [0, 1, 0], 2.4, 16);
+    poolBd.disc([52, 0.17, 74.7], [0, 1, 0], 2.4, 16);
+    poolBd.disc([42, 0.17, 61.3], [0, 1, 0], 2.4, 16);
+  }
   bd.setMat(MAT.METAL).setColor(0.35, 0.35, 0.38);
   bd.tube([45.5, 0.05, 62], [45.5, 2.6, 62], 0.06, 0.05, 6, true);
   bd.tube([48.5, 0.05, 62], [48.5, 2.6, 62], 0.06, 0.05, 6, true);
@@ -983,6 +1131,7 @@ export function buildWorld() {
   const colliders = [];
   const rng = rng32(20261118);
   const puddleBd = new MeshBuilder();
+  const poolBd = new MeshBuilder(); // streetlight pools (faded in at night)
 
   // Ground: mainland slab + island + beach sand.
   bd.setMat(MAT.PLAIN).setSeed(0).setColor(0.42, 0.44, 0.36);
@@ -1270,12 +1419,24 @@ export function buildWorld() {
     chunks.flushIfNearLimit();
   }
 
-  // Streetlights along avenues + streets.
+  // Streetlights along avenues + streets — and a warm light pool on the
+  // ground under each lamp head (a separate mesh, faded in at night by
+  // the draw code via sky.windowLit; the pool sits at the arm tip, so
+  // the light spills from the sidewalk onto the road edge). Pools ride
+  // at y 0.17: the sidewalk boxes top out at 0.15, so a pool at ground
+  // level would be buried under the sidewalk.
+  poolBd.setMat(MAT.EMIT).setColor(1.0, 0.72, 0.35);
   for (const x of AVENUES) {
-    for (let z = -95; z <= 95; z += 25) buildStreetlight(bd, x + 5.5, z, true);
+    for (let z = -95; z <= 95; z += 25) {
+      buildStreetlight(bd, x + 5.5, z, true);
+      poolBd.disc([x + 5.5, 0.17, z - 1.3], [0, 1, 0], 2.4, 16);
+    }
   }
   for (const z of STREETS) {
-    for (let x = -115; x <= 115; x += 30) buildStreetlight(bd, x, z + 5.5, false);
+    for (let x = -115; x <= 115; x += 30) {
+      buildStreetlight(bd, x, z + 5.5, false);
+      poolBd.disc([x, 0.17, z + 6.8], [0, 1, 0], 2.4, 16);
+    }
   }
 
   // Traffic-light poles at every signaled intersection (the lamps are
@@ -1303,6 +1464,61 @@ export function buildWorld() {
   buildPlanter(bd, 50, 92);
   buildBench(bd, -24, 44, 0);
   buildPlanter(bd, -36, 44);
+
+  // Roadside props (GTA-like street furniture): parking meters, bus stops,
+  // street signs, newsstands, vendor carts, barriers, mailboxes, bike
+  // racks — one-sided like the streetlights (avenue props on the east
+  // sidewalk facing west, street props on the south sidewalk facing
+  // north). Every spot sits on a midpoint between streetlights (avenues:
+  // z step 25; streets: x step 30), clear of palms (avenue rows at
+  // x +/- 6.5, z step 45), hydrants (z -75 / 25), traffic-light poles
+  // (intersections, +/- 5.5 / 6.5) and the beachfront dressing (z 105,
+  // already dense — no new props there). Big props get colliders.
+  const AW = -Math.PI / 2; // avenue props face west (toward the road)
+  const SN = Math.PI; // street props face north (toward the road)
+  // Avenues (east sidewalk, x + 5.5).
+  buildBarrier(bd, -114.5, -60, AW);
+  buildBarrier(bd, -114.5, -10, AW);
+  buildNewsstand(bd, -54.5, -35, AW);
+  colliders.push({ x0: -55.2, z0: -35.9, x1: -53.8, z1: -34.1 });
+  buildBusStop(bd, -54.5, 15, AW);
+  colliders.push({ x0: -55.05, z0: 13.65, x1: -53.95, z1: 16.35 });
+  buildParkingMeter(bd, -54.5, 65, AW);
+  buildParkingMeter(bd, 5.5, -60, AW);
+  buildStreetSign(bd, 5.5, -10, AW);
+  buildMailbox(bd, 5.5, 15, AW);
+  buildStreetSign(bd, 5.5, 65, AW);
+  buildBusStop(bd, 65.5, -35, AW);
+  colliders.push({ x0: 64.95, z0: -36.35, x1: 66.05, z1: -33.65 });
+  buildVendorCart(bd, 65.5, 15, AW, 11);
+  colliders.push({ x0: 64.95, z0: 14.2, x1: 66.05, z1: 15.8 });
+  buildBikeRack(bd, 65.5, 65, AW);
+  buildStreetSign(bd, 125.5, -60, AW);
+  buildParkingMeter(bd, 125.5, -10, AW);
+  buildVendorCart(bd, 125.5, 40, AW, 23);
+  colliders.push({ x0: 124.95, z0: 39.2, x1: 126.05, z1: 40.8 });
+  // Streets (south sidewalk, z + 5.5). The beachfront (z 100) is skipped —
+  // its dressing (benches, planters, kiosk, bike rack) is already dense.
+  buildParkingMeter(bd, -70, -94.5, SN);
+  buildStreetSign(bd, 20, -94.5, SN);
+  buildBarrier(bd, 80, -94.5, SN);
+  buildNewsstand(bd, -40, -44.5, SN);
+  colliders.push({ x0: -40.9, z0: -45.2, x1: -39.1, z1: -43.8 });
+  buildVendorCart(bd, 20, -44.5, SN, 37);
+  colliders.push({ x0: 19.2, z0: -45.05, x1: 20.8, z1: -43.95 });
+  buildParkingMeter(bd, -100, -44.5, SN);
+  buildParkingMeter(bd, 80, -44.5, SN);
+  buildBusStop(bd, 50, -44.5, SN);
+  colliders.push({ x0: 48.65, z0: -45.05, x1: 51.35, z1: -43.95 });
+  buildStreetSign(bd, -70, 5.5, SN);
+  buildMailbox(bd, -10, 5.5, SN);
+  buildVendorCart(bd, 50, 5.5, SN, 41);
+  colliders.push({ x0: 49.2, z0: 4.95, x1: 50.8, z1: 6.05 });
+  buildBusStop(bd, -40, 55.5, SN);
+  colliders.push({ x0: -41.35, z0: 54.95, x1: -38.65, z1: 56.05 });
+  buildBikeRack(bd, 20, 55.5, SN);
+  buildParkingMeter(bd, 80, 55.5, SN);
+  chunks.flushIfNearLimit();
 
   // Market stalls in Barrio Sol.
   for (let i = 0; i < 6; i++) {
@@ -1359,7 +1575,7 @@ export function buildWorld() {
   chunks.flushIfNearLimit();
 
   // Rambla Park: the green pocket park on the beachfront block.
-  buildPark(bd);
+  buildPark(bd, poolBd);
   colliders.push({ x0: 39.5, z0: 81.5, x1: 44.5, z1: 86.5 }); // fountain
   colliders.push({ x0: 36.4, z0: 69.4, x1: 37.6, z1: 70.6 }); // statue
   chunks.flushIfNearLimit();
@@ -1375,6 +1591,7 @@ export function buildWorld() {
   return {
     chunks: chunks.finish(),
     puddles: puddleBd.build(),
+    lampPools: poolBd.build(),
     colliders,
   };
 }

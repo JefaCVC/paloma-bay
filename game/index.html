@@ -65,17 +65,22 @@
 
   #minimap { width: 180px; height: 180px; border: var(--panel-border); border-radius: 50%; background: #1d4a66; }
   #radio-box { padding: 0; text-align: right; width: 100%; }
-  /* Mission + response panels: a left-fading wash, not a box. */
-  #response-panel { padding: 6px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.55), rgba(8,12,20,0.0)); }
+  /* Mission + response panels: a left-fading wash, not a box. The wash
+     HOLDS its dark value across the text zone (to 84%) and only then
+     fades out — a straight 0→100% fade left the right-hand text (the
+     PBPD distances, the mission NEXT line) sitting on the bright scene.
+     The rows end well inside the dark zone: mission text is capped by
+     the panel's right padding, response rows by their own right padding. */
+  #response-panel { padding: 6px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.62) 0%, rgba(8,12,20,0.62) 84%, rgba(8,12,20,0) 100%); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
   #response-panel h5 { margin: 0 0 4px; font-size: 11px; letter-spacing: 1.5px; color: var(--red); text-align: left; }
-  .resp-row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; color: #e8ecf4; white-space: nowrap; }
+  .resp-row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; color: #e8ecf4; white-space: nowrap; padding-right: 48px; }
   .resp-row .st { color: var(--amber); }
   .resp-row .d { color: #9fb0c8; }
   #clock { font-size: 16px; font-weight: 700; }
   #district { font-size: 14px; font-weight: 700; color: var(--amber); text-align: center; }
   #radio { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  #mission-panel { padding: 8px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.55), rgba(8,12,20,0.0)); }
+  #mission-panel { padding: 8px 48px 8px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.62) 0%, rgba(8,12,20,0.62) 84%, rgba(8,12,20,0) 100%); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
   #mission-name { font-size: 15px; font-weight: 700; color: var(--amber); }
   #mission-stage { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
   #mission-objective { font-size: 14px; margin-top: 4px; }
@@ -476,7 +481,7 @@
     <button class="btn" id="btn-settings-back">BACK</button>
   </div>
   <div id="title-bottom">
-    <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Eight missions. Three choices. Three endings.</div>
+    <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Nine missions. Three choices. Three endings.</div>
     <div id="title-portraits"></div>
   </div>
   <div id="title-hint">Enter to select · arrows to move</div>

@@ -285,15 +285,25 @@ export function buildJetSki(color) {
   return bd.build();
 }
 
-// Police light bar: red and blue halves, drawn alternately per frame.
+// Police light bar: red left half + blue right half (from the chase cam,
+// red reads on the left, blue on the right), each in a bright and a dim
+// variant. The draw loop alternates which side is bright, so the bar
+// flashes red-blue in live play — and a frozen frame still shows red on
+// one side and blue on the other, because the dim side stays coloured.
+// The bar sits on the black roof band (see buildCarBody's police extras).
 export function buildLightBar() {
-  const mk = (color) => {
+  const mk = (color, z0, z1) => {
     const bd = new MeshBuilder();
     bd.setMat(MAT.EMIT).setColor(color[0], color[1], color[2]);
-    bd.box(-0.35, 1.34, -0.45, 0.35, 1.52, 0.45);
+    bd.box(-0.35, 1.34, z0, 0.35, 1.52, z1);
     return bd.build();
   };
-  return { red: mk([1.0, 0.1, 0.1]), blue: mk([0.15, 0.3, 1.0]) };
+  return {
+    redBright: mk([1.0, 0.10, 0.10], -0.45, -0.03),
+    redDim: mk([0.42, 0.08, 0.08], -0.45, -0.03),
+    blueBright: mk([0.15, 0.30, 1.00], 0.03, 0.45),
+    blueDim: mk([0.10, 0.16, 0.45], 0.03, 0.45),
+  };
 }
 
 // --- helicopter (PBPD AIR-1) ---------------------------------------------------

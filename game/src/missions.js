@@ -1,8 +1,10 @@
-// missions.js — the story of PALOMA BAY: 8 named missions, sequential with
+// missions.js — the story of PALOMA BAY: 9 named missions, sequential with
 // locks, multi-stage with NEXT lines and payouts, 3 branching CHOICES
 // (missions 3, 5, 7) feeding a visible LOYALTY / FAVOR tracker, and 3
-// endings. Data first: the table is the story; the state machine below it
-// just walks the table. All names and story are original to this game.
+// endings. Missions 1–8 are the story arc; mission 9 ("Hot Pursuit") is a
+// post-finale chase that unlocks after the ending. Data first: the table
+// is the story; the state machine below it just walks the table. All names
+// and story are original to this game.
 
 import { POI } from './world.js';
 
@@ -10,7 +12,9 @@ import { POI } from './world.js';
 //   driveTo  — reach a marker (any way you like), radius 6
 //   dialog   — a line of story; advance with E / click
 //   combat   — eliminate N enemies spawned near the marker
-//   chase    — lose the heat (wanted back to 0)
+//   chase    — lose the heat (wanted back to 0). A chase stage may set
+//              `wanted` (default 2 — 3 brings the helicopter) and
+//              `chatter` (radio lines pushed when the stage begins).
 //   choice   — pick one option; consequences apply at once
 //   deliver  — reach a marker carrying something (same as driveTo, new label)
 //   escape   — reach the marker while wanted (finales)
@@ -121,6 +125,22 @@ export const MISSIONS = [
     payout: 0, rep: 3,
     // Stages are picked at runtime from the ending variant (see FINALES).
     stages: [],
+  },
+  {
+    id: 9, name: 'Hot Pursuit', giver: 'Mara Marchetti', district: 'La Rambla',
+    brief: 'The PBPD task force wants the Falco back. Outrun them — then vanish.',
+    payout: 2500, rep: 2,
+    stages: [
+      { type: 'dialog', speaker: 'MARA MARCHETTI', text: "Theo — the PBPD set up a dragnet on the strip. New task force, three cars and a heli, and they want the Falco back. Don't stop. Don't get boxed in. Lose them, then get to the safehouse.", next: 'Outrun the PBPD' },
+      {
+        type: 'chase', wanted: 3, text: 'Outrun the PBPD — break line of sight', next: 'Reach the safehouse',
+        chatter: [
+          "Mara: Don't get boxed in — the causeway is clear.",
+          'Zed: Three cars and a heli, Theo. Stay on the beachfront.',
+        ],
+      },
+      { type: 'driveTo', x: POI.safehouse.x, z: POI.safehouse.z + 10, text: 'Reach the safehouse — the heat is off', next: 'Mission complete' },
+    ],
   },
 ];
 
@@ -252,7 +272,8 @@ export function applyChoice(state, choiceId, optionIndex, profile) {
   return opt;
 }
 
-// Completion %: missions 48 + postcards 20 + upgrades 12 + endings 20.
+// Completion %: missions 6 each (9 missions) + postcards 20 + upgrades 12
+// + endings 20, capped at 100.
 export function completionPercent(profile) {
   const missions = (profile.missionsDone || []).length * 6;
   const cards = (profile.postcards || []).length * 1;

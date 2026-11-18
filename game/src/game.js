@@ -131,6 +131,7 @@ let markerMesh = null; // enemy marker: crossed red arrows above hostile heads
 let ferrisMesh = null;
 let staticMeshes = [];
 let puddleMesh = null;
+let lampPoolMesh = null; // warm ground pools under every streetlight (night)
 let carBlobMesh = null;
 let charBlobMesh = null;
 let spotBlobMesh = null;
@@ -223,11 +224,20 @@ function initWorld() {
   colliders = world.colliders;
   staticMeshes = world.chunks.map((c) => uploadMesh(c, false));
   puddleMesh = uploadMesh(world.puddles, false);
+  lampPoolMesh = uploadMesh(world.lampPools, false);
   wheelMesh = uploadMesh(buildWheel(), false);
-  lightBarMeshes = {
-    red: uploadMesh(buildLightBar().red, false),
-    blue: uploadMesh(buildLightBar().blue, false),
-  };
+  {
+    // Siren light bar: red left half + blue right half, each in a bright
+    // and a dim variant — the draw loop alternates which side is bright,
+    // so both colours always read (even in a frozen screenshot).
+    const lb = buildLightBar();
+    lightBarMeshes = {
+      redBright: uploadMesh(lb.redBright, false),
+      redDim: uploadMesh(lb.redDim, false),
+      blueBright: uploadMesh(lb.blueBright, false),
+      blueDim: uploadMesh(lb.blueDim, false),
+    };
+  }
   const heli = buildHelicopter();
   heliMeshes = {
     body: uploadMesh(heli.body, false),
@@ -316,7 +326,7 @@ function initWorld() {
 
 function updateMissionBeacon() {
   const ms = missions();
-  if (ms.active || ms.nextId > 8) {
+  if (ms.active || ms.nextId > MISSIONS.length) {
     G.missionBeacon = null;
     return;
   }
@@ -1195,7 +1205,15 @@ function beginStage() {
       spawnEnemy(stage.x + Math.cos(a) * (8 + i * 2), stage.z + Math.sin(a) * (8 + i * 2), 'thug', i % 3 === 0 ? 'smg' : 'pistol');
     }
   } else if (stage.type === 'chase') {
-    setWanted(G.police, 2, G.gameTime);
+    setWanted(G.police, stage.wanted || 2, G.gameTime);
+    // Crew radio lines for the chase (e.g. mission 9's Mara + Zed): pushed
+    // into the dispatch feed so the pursuit opens with the crew talking.
+    if (stage.chatter) {
+      for (const text of stage.chatter) {
+        G.police.chatter.push({ text, t: G.gameTime });
+        if (G.police.chatter.length > 3) G.police.chatter.shift();
+      }
+    }
   } else if (stage.type === 'escape') {
     setWanted(G.police, 2, G.gameTime);
   } else if (stage.type === 'dialog') {
@@ -1886,13 +1904,24 @@ function renderFrame(t) {
         drawLit(wheelMesh, wm, m4.multiply(vp, wm), t, 1);
       }
     }
-    // Police light bar (alternating red/blue).
+    // Police light bar: red left half + blue right half, alternating
+    // which side is bright (4 Hz). Both colours always read — the dim
+    // side stays visibly coloured, so a frozen frame still shows red
+    // on one side and blue on the other.
     if (car.model === 'police') {
-      const bar = Math.floor(t * 4) % 2 === 0 ? lightBarMeshes.red : lightBarMeshes.blue;
-      drawLit(bar, carM, m4.multiply(vp, carM), t, 1);
+      const phase = Math.floor(t * 4) % 2 === 0;
+      drawLit(phase ? lightBarMeshes.redBright : lightBarMeshes.redDim, carM, m4.multiply(vp, carM), t, 1);
+      drawLit(phase ? lightBarMeshes.blueDim : lightBarMeshes.blueBright, carM, m4.multiply(vp, carM), t, 1);
     }
     // Contact shadow.
     drawBlob(carBlobMesh, m4.multiply(vp, frame(car.x, 0.04, car.z, car.yaw, 0, 0, 1)), [0.05, 0.03, 0.02, 0.38]);
+    // Siren wash: the flashing bar spills alternating red/blue light onto
+    // the road around the car (drawn after the shadow so it blends over).
+    if (car.model === 'police') {
+      const phase = Math.floor(t * 4) % 2 === 0;
+      const glow = phase ? [1.0, 0.12, 0.10, 0.16] : [0.15, 0.35, 1.0, 0.16];
+      drawBlob(spotBlobMesh, m4.multiply(vp, frame(car.x, 0.06, car.z, 0, 0, 0, 0.9)), glow);
+    }
   }
 
   // Jet skis (bobbing on the swell, pitching with speed, rolling in turns).
@@ -2017,6 +2046,13 @@ function renderFrame(t) {
   // Rain puddles + rain streaks.
   if (sky.wet > 0.05) {
     drawLit(puddleMesh, IDENT, vp, t, sky.wet * 0.8, true);
+  }
+  // Lamp light pools: warm ground glow under every streetlight, fading in
+  // with the night (windowLit is ~0.08 by day, 0.55 at dusk, 0.85 at night).
+  // Lamp light pools: warm ground glow under every streetlight, fading in
+  // with the night (windowLit is ~0.08 by day, 0.55 at dusk, 0.85 at night).
+  if (sky.windowLit > 0.05) {
+    drawLit(lampPoolMesh, IDENT, vp, t, sky.windowLit, true);
   }
   if (G.rain > 0.05) {
     drawLit(rainMesh, IDENT, vp, t, 0.35 * G.rain, true);
@@ -2336,6 +2372,9 @@ function wireScreens() {
     G.mode = 'play';
     showScreen(null);
     sfxClick();
+    // Post-finale free-roam: the next mission's beacon appears (mission 9,
+    // "Hot Pursuit", unlocks at the garage once the story is done).
+    updateMissionBeacon();
   });
   $('btn-ending-title').addEventListener('click', () => {
     G.mode = 'title';

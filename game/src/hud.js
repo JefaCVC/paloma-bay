@@ -683,7 +683,7 @@ export function fillPauseScreen(view, tab) {
   if (el['pause-progress']) {
     const s = p.stats;
     const tiles = [
-      ['STORY JOBS', p.missionsDone.length + ' / 8'],
+      ['STORY JOBS', p.missionsDone.length + ' / ' + MISSIONS.length],
       ['CASH', '$' + Math.floor(p.cash).toLocaleString('en-US')],
       ['POSTCARDS', p.postcards.length + ' / 20'],
       ['REPUTATION', REP_TITLES[p.rep]],
@@ -859,7 +859,7 @@ export function fillEndingScreen(ending, profile) {
   if (el['ending-stats']) {
     el['ending-stats'].innerHTML =
       '<div class="prow"><span>Completion</span><span>' + completionPercent(profile) + '%</span></div>' +
-      '<div class="prow"><span>Missions complete</span><span>' + profile.missionsDone.length + ' / 8</span></div>' +
+      '<div class="prow"><span>Missions complete</span><span>' + profile.missionsDone.length + ' / ' + MISSIONS.length + '</span></div>' +
       '<div class="prow"><span>Cash</span><span>$' + Math.floor(profile.cash).toLocaleString('en-US') + '</span></div>' +
       '<div class="prow"><span>Loyalty / Favor</span><span>' + Math.round(profile.loyalty) + ' / ' + Math.round(profile.favor) + '</span></div>' +
       '<div class="prow"><span>Postcards</span><span>' + profile.postcards.length + ' / 20</span></div>';
