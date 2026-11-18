@@ -12,7 +12,11 @@ PALOMA BAY — a sun-soaked crime story. An open-world 3D action game built from
 cd game && python3 -m http.server 8000
 ```
 
-Then open http://localhost:8000 in desktop Chrome. WASD drives and walks, mouse aims, click shoots, 1–5 switch weapons, M opens the map.
+Then open http://localhost:8000 in desktop Chrome.
+
+## Controls
+
+WASD drive / walk · Mouse aim · Click shoot · 1–5 weapons · E enter car / interact · R reload · Shift nitro · Space handbrake · M map / pause
 
 ---
 
