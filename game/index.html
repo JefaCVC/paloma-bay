@@ -55,6 +55,11 @@
 
   #minimap { width: 180px; height: 180px; border: var(--panel-border); border-radius: 8px; background: #1d4a66; }
   #clock-box { padding: 6px 12px; text-align: right; width: 100%; }
+  #response-panel { padding: 6px 12px; width: 100%; display: none; }
+  #response-panel h5 { margin: 0 0 4px; font-size: 11px; letter-spacing: 1.5px; color: var(--red); text-align: right; }
+  .resp-row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; color: #e8ecf4; white-space: nowrap; }
+  .resp-row .st { color: var(--amber); }
+  .resp-row .d { color: #9fb0c8; }
   #clock { font-size: 16px; font-weight: 700; }
   #district { font-size: 13px; color: var(--amber); }
   #radio { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 172px; }
@@ -100,7 +105,7 @@
   #dialog-text { font-size: 16px; line-height: 1.45; margin-top: 4px; }
   #dialog .dialog-hint { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: right; }
   #choices {
-    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    position: fixed; left: 50%; top: 12%; transform: translateX(-50%);
     width: 560px; max-width: 92vw; background: var(--panel); border: 2px solid var(--amber);
     border-radius: 12px; padding: 20px 24px; display: none; z-index: 8; pointer-events: auto;
   }
@@ -135,7 +140,7 @@
     position: fixed; inset: 0; z-index: 20; display: none;
     align-items: center; justify-content: center; flex-direction: column;
     background: linear-gradient(180deg, rgba(8, 10, 18, 0.55), rgba(8, 10, 18, 0.82));
-    overflow-y: auto; padding: 24px;
+    overflow-y: auto; padding: 16px;
   }
   .logo { font-size: 72px; font-weight: 900; letter-spacing: 10px; color: var(--amber); line-height: 1; }
   .logo-sub { font-size: 18px; letter-spacing: 4px; color: var(--text); margin-top: 8px; }
@@ -156,22 +161,23 @@
 
   /* pause screen: map left, systems right */
   #pause-screen { justify-content: flex-start; }
-  .pause-head { font-size: 28px; font-weight: 900; letter-spacing: 6px; color: var(--amber); margin-bottom: 12px; }
+  .pause-head { font-size: 24px; font-weight: 900; letter-spacing: 6px; color: var(--amber); margin-bottom: 8px; }
   .pause-row { display: flex; gap: 16px; align-items: flex-start; }
   #map-wrap { flex: none; }
-  #map-canvas { width: 640px; height: 520px; border: var(--panel-border); border-radius: 8px; background: #1d4a66; display: block; }
+  #map-canvas { width: 640px; height: 560px; border: var(--panel-border); border-radius: 8px; background: #1d4a66; display: block; }
   .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 8px; max-width: 640px; }
   .legend b { color: var(--text); }
-  #pause-side { width: 300px; display: flex; flex-direction: column; gap: 12px; }
-  .side-block { padding: 10px 12px; }
-  .side-block h4 { margin: 0 0 8px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
-  .prow { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; gap: 8px; }
+  #pause-side { width: 300px; display: flex; flex-direction: column; gap: 8px; }
+  .side-block { padding: 8px 12px; }
+  .side-block h4 { margin: 0 0 6px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
+  .prow { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; gap: 8px; }
   .prow span:last-child { text-align: right; }
   .prow.done span:last-child { color: var(--green); }
   .prow.open span:last-child { color: var(--amber); }
   .prow.locked { opacity: 0.45; }
   .pause-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-  .pause-btns .btn { flex: 1; min-width: 120px; padding: 10px 8px; font-size: 14px; }
+  #pause-saves .btn { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
+  .pause-btns .btn { flex: 1 1 0; min-width: 0; padding: 8px 6px; font-size: 13px; }
 
   /* shop + ending + dead */
   #shop-screen .shop-box { width: 640px; max-width: 94vw; padding: 20px 24px; }
@@ -213,6 +219,10 @@
       <div id="clock" class="outline">18:12 · DAY 1</div>
       <div id="district">Barrio Sol</div>
       <div id="radio">Radio Paloma 88.5</div>
+    </div>
+    <div class="panel" id="response-panel">
+      <h5>PBPD RESPONSE</h5>
+      <div id="response-rows"></div>
     </div>
   </div>
   <div class="corner" id="corner-bl">
@@ -277,7 +287,7 @@
   <div class="pause-head outline">PALOMA BAY</div>
   <div class="pause-row">
     <div id="map-wrap">
-      <canvas id="map-canvas" width="640" height="520"></canvas>
+      <canvas id="map-canvas" width="640" height="560"></canvas>
       <div class="legend">
         <span><b style="color:#ffd23e">◆</b> Mission</span>
         <span><b style="color:#4da6ff">●</b> Mara's Garage</span>

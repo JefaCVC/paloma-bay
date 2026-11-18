@@ -1214,8 +1214,14 @@ function hudView() {
   const w = WEAPONS[loadout.current];
   const slot = loadout.owned[loadout.current];
   const hint = player.inCar
-    ? 'WASD drive · SPACE handbrake · SHIFT nitro · E exit · H horn · Z Mara repair · X fence car · M map'
-    : 'WASD move · Mouse aim · Click shoot · RMB aim · 1-5 weapons · R reload · E interact · M map';
+    ? 'WASD drive · SPACE brake · SHIFT nitro · E exit · H horn · Z repair · X fence · M map'
+    : 'WASD move · Click shoot · RMB aim · 1-5 weapons · R reload · E use · M map';
+  // Live helicopter distance for the response panel.
+  if (G.police.heli) {
+    G.police.heliDist = Math.round(
+      Math.hypot(G.police.heli.x - player.x, G.police.heli.z - player.z),
+    );
+  }
   return {
     profile: profile(),
     police: G.police,
@@ -1260,8 +1266,8 @@ function updateCamera(dt) {
   if (player.inCar && player.car) {
     const car = player.car;
     const speed = Math.abs(car.speed);
-    const dist = 8.5 + speed * 0.12;
-    const height = 3.4 + speed * 0.02;
+    const dist = 7 + speed * 0.08;
+    const height = 2.8 + speed * 0.015;
     const bx = car.x - Math.cos(cam.yaw) * dist;
     const bz = car.z + Math.sin(cam.yaw) * dist;
     camPos[0] = damp(camPos[0], bx, 6, dt);
@@ -1269,7 +1275,7 @@ function updateCamera(dt) {
     camPos[2] = damp(camPos[2], bz, 6, dt);
     const fov = 60 + Math.min(16, speed * 0.45);
     cam.fov = damp(cam.fov, fov, 4, dt);
-    return { target: [car.x + Math.cos(car.yaw) * 4, 1.6, car.z - Math.sin(car.yaw) * 4], fov: cam.fov };
+    return { target: [car.x + Math.cos(car.yaw) * 2, 1.6, car.z - Math.sin(car.yaw) * 2], fov: cam.fov };
   }
   // On foot: third person behind the camera yaw.
   const dist = player.aiming > 0.5 ? 3.4 : 5.6;
@@ -1714,8 +1720,8 @@ function boot() {
   G.shotName = params.get('shot');
   G.freezeT = params.has('t') ? parseFloat(params.get('t')) : null;
 
-  resizeCanvas();
   if (!initGL(canvas, showError)) return;
+  resizeCanvas();
   initHUD();
   initWorld();
   initRain();
@@ -1739,7 +1745,7 @@ function boot() {
     G.camView = updateCamera(3);
     if (G.rain > 0.05) { rebuildRain(0.2); rebuildRain(0.2); rebuildRain(0.2); }
     renderFrame(t);
-    if (G.mode === 'play' || G.mode === 'choice' || G.mode === 'pause') {
+    if (G.mode === 'play' || G.mode === 'choice') {
       document.getElementById('hud').style.display = 'block';
       updateHUD(hudView());
     }
@@ -1760,6 +1766,11 @@ function shotApi() {
     profile() { return profile(); },
     addCar(model, colorIdx, x, z, yaw, kind) {
       return spawnCar(model, colorIdx, x, z, yaw, kind || 'traffic');
+    },
+    addPed(x, z) {
+      const ped = spawnPed(x, z, [[x, z], [x + 6, z + 2]]);
+      ped.yaw = Math.PI / 2;
+      return ped;
     },
     setPlayerCar(model, colorIdx, x, z, yaw, speed) {
       const car = spawnCar(model, colorIdx, x, z, yaw, 'player');
@@ -1789,14 +1800,21 @@ function shotApi() {
       G.police.units.push(u);
       return u;
     },
-    setHeli(x, z) {
-      G.police.heli = { x, y: 26, z, angle: 0, rotor: 2.4 };
+    setHeli(x, z, y) {
+      G.police.heli = { x, y: y || 26, z, angle: 0, rotor: 2.4 };
     },
     spawnEnemiesAt(x, z, count) {
+      const out = [];
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU + 0.5;
-        spawnEnemy(x + Math.cos(a) * 9, z + Math.sin(a) * 9, 'thug', i % 2 ? 'smg' : 'pistol');
+        const e = spawnEnemy(x + Math.cos(a) * 9, z + Math.sin(a) * 9, 'thug', i % 2 ? 'smg' : 'pistol');
+        // Face the player, weapons raised — the frame must read as a fight.
+        e.yaw = Math.atan2(-(player.z - e.z), player.x - e.x);
+        e.aimYaw = e.yaw;
+        e.aiming = 1;
+        out.push(e);
       }
+      return out;
     },
     setWanted(n) {
       setWanted(G.police, n, G.gameTime);

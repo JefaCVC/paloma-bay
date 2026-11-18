@@ -22,23 +22,31 @@ export function stageShot(G, api, name) {
   if (name === 'cover') {
     // Dusk chase on La Rambla: hero coupe, 3 PBPD units + AIR-1, wanted 3,
     // mission 5 ("Siren Song") in its chase stage, rich HUD numbers.
+    // Police sit ahead/beside the player so they are IN the chase-cam frame.
     api.setTime(18.4, 0);
     api.setCash(12480);
     api.setRep(2);
     api.setLoyaltyFavor(65, 45);
+    const ms = api.missions();
+    ms.done = [1, 2, 3, 4];
+    ms.nextId = 5;
+    api.profile().missionsDone = [1, 2, 3, 4];
     api.setPlayerCar('coupe', 0, 20, 50, 0, 22);
-    api.addCar('sedan', 1, 55, 50, 0, 'traffic');
-    api.addCar('van', 0, -30, 50, 0, 'traffic');
+    api.addCar('sedan', 1, 52, 50, 0, 'traffic');
+    api.addCar('van', 0, 66, 46, 0, 'traffic');
+    api.addPed(28, 44.5);
+    api.addPed(36, 55.5);
+    api.addPed(13, 45.5);
     api.startMissionAt(5, 1);
     // Override the mission's wanted-2 with a full 3-star pursuit.
     G.police.wanted = 3;
     G.police.heat = 40;
     G.police.trace = 82;
     G.police.units = [];
-    api.addPoliceCar(8, 45.5, 0, 24);
-    api.addPoliceCar(6, 54.5, 0, 22);
-    api.addPoliceCar(42, 54, Math.PI, 18);
-    api.setHeli(28, 34);
+    api.addPoliceCar(35, 46.5, 0, 24);
+    api.addPoliceCar(38, 54, 0, 22);
+    api.addPoliceCar(29, 54.5, 0, 20);
+    api.setHeli(48, 42, 17);
     G.playerX = 20; G.playerZ = 50;
     setUnitDistances(G);
     G.police.chatter = [
@@ -54,13 +62,22 @@ export function stageShot(G, api, name) {
     api.setCash(9870);
     api.setRep(2);
     api.setLoyaltyFavor(58, 52);
-    api.setPlayerOnFoot(-88, -72, Math.PI / 2, 'rifle', true);
-    api.spawnEnemiesAt(-84, -66, 3);
-    api.addPoliceCar(-70, -78, Math.PI / 2, 0);
+    const ms2 = api.missions();
+    ms2.done = [1, 2, 3, 4];
+    ms2.nextId = 5;
+    api.profile().missionsDone = [1, 2, 3, 4];
+    api.setPlayerOnFoot(-60, -50, Math.PI / 2, 'rifle', true);
+    // 3/4 camera angle: Theo's profile + rifle silhouette read against the
+    // lit street instead of a dead-behind shot.
+    G.camera.yaw = Math.PI / 2 + 0.55;
+    api.spawnEnemiesAt(-60, -64, 3);
+    api.addPoliceCar(-48, -50, Math.PI, 0);
+    api.addPed(-56, -46);
+    api.addPed(-64, -54);
     G.police.wanted = 2;
     G.police.heat = 30;
     G.police.trace = 64;
-    G.playerX = -88; G.playerZ = -72;
+    G.playerX = -60; G.playerZ = -50;
     setUnitDistances(G);
     G.police.chatter = [
       { text: 'PBPD-1: Suspect is on foot near Old Town Road.', t: 0 },

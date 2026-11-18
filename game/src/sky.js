@@ -10,10 +10,10 @@ import { clamp, lerp, v3 } from './math.js';
 // fog colour + range, hemisphere ambient, and how "lit" windows look.
 const PRESETS = {
   night: {
-    sunDir: [0.4, 0.55, -0.3], sunColor: [0.45, 0.55, 0.85], sunIntensity: 0.25,
+    sunDir: [0.4, 0.55, -0.3], sunColor: [0.45, 0.55, 0.85], sunIntensity: 0.55,
     zenith: [0.03, 0.04, 0.10], horizon: [0.10, 0.09, 0.16],
     fogColor: [0.08, 0.08, 0.13], fogNear: 40, fogFar: 150,
-    ambSky: [0.16, 0.18, 0.26], ambGround: [0.10, 0.09, 0.11], ambStrength: 0.9,
+    ambSky: [0.26, 0.28, 0.38], ambGround: [0.16, 0.14, 0.16], ambStrength: 0.9,
     windowLit: 0.85, name: 'Night',
   },
   dawn: {
@@ -95,7 +95,7 @@ export function updateSky(hour, rain) {
     sky.horizon = grey(sky.horizon).map((v) => v * (1 - 0.40 * r));
     sky.fogColor = grey(sky.fogColor).map((v) => v * (1 - 0.35 * r));
     sky.sunColor = sky.sunColor.map((v) => v * (1 - 0.6 * r));
-    sky.sunIntensity *= 1 - 0.7 * r;
+    sky.sunIntensity *= 1 - 0.5 * r;
     sky.fogFar = lerp(sky.fogFar, 110, r);
     sky.windowLit = lerp(sky.windowLit, 0.9, r * 0.5);
   }

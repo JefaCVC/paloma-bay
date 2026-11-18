@@ -25,6 +25,7 @@ export function initHUD() {
     'hud', 'wanted-stars', 'cash', 'rep-title', 'loyalty-bar', 'loyalty-val',
     'favor-bar', 'favor-val', 'trace-wrap', 'trace-bar', 'trace-val',
     'minimap', 'clock', 'district', 'radio',
+    'response-panel', 'response-rows',
     'mission-panel', 'mission-name', 'mission-stage', 'mission-objective',
     'mission-dist', 'mission-next', 'chatter',
     'weapon-name', 'weapon-ammo', 'weapon-slots', 'speed', 'speed-wrap', 'hint',
@@ -72,6 +73,26 @@ export function updateHUD(view) {
   setText(el.clock, clockLabel(view.hour) + ' · DAY ' + view.day + (view.rain > 0.3 ? ' · RAIN' : ''));
   setText(el.district, view.district);
   setText(el.radio, view.station + ' — ' + view.track);
+  // PBPD response panel: per-unit name + live distance + state.
+  if (el['response-panel']) {
+    const units = view.police.units || [];
+    const show = units.length > 0 || view.police.heli;
+    el['response-panel'].style.display = show ? 'block' : 'none';
+    if (show && el['response-rows']) {
+      let html = '';
+      for (const u of units.slice(0, 4)) {
+        html += '<div class="resp-row"><span>' + escapeHtml(u.name) + '</span>'
+          + '<span class="st">' + escapeHtml(u.state || 'RESPONDING') + '</span>'
+          + '<span class="d">' + Math.round(u.dist || 0) + 'm</span></div>';
+      }
+      if (view.police.heli) {
+        html += '<div class="resp-row"><span>AIR-1 HELI</span>'
+          + '<span class="st">SPOTLIGHT</span>'
+          + '<span class="d">' + Math.round(view.police.heliDist || 0) + 'm</span></div>';
+      }
+      if (el['response-rows'].innerHTML !== html) el['response-rows'].innerHTML = html;
+    }
+  }
   // Bottom-left: mission objective.
   if (el['mission-panel']) {
     const m = view.mission;
@@ -247,21 +268,29 @@ function drawMinimap(ctx, view) {
 export function drawFullMap(view) {
   if (!mapCtx) return;
   const ctx = mapCtx;
-  const w = 640, h = 520;
+  // Full world incl. Isla Verde: x -240..240 (480u), z -175..245 (420u).
+  const w = 640, h = 560;
   ctx.clearRect(0, 0, w, h);
-  const scale = w / (CITY.x1 - CITY.x0 + 40);
-  const { X, Z } = drawWorldBase(ctx, w, h, scale, CITY.x0 - 20, CITY.z0 - 20);
-  // District labels — measured so each stays centred on its region.
+  const scale = Math.min(w / 480, h / 420);
+  const { X, Z } = drawWorldBase(ctx, w, h, scale, -240, -175);
+  // Labels are clamped to the canvas: no text may leave the map.
+  const clampLabel = (x, y, tw) => [
+    Math.max(4, Math.min(w - tw - 4, x)),
+    Math.max(12, Math.min(h - 4, y)),
+  ];
+  // District labels — at the top edge of each region (clear of the POI
+  // labels, which sit near the region centres), measured + clamped.
   ctx.font = 'bold 13px Arial, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.strokeStyle = 'rgba(0,0,0,0.7)';
   ctx.lineWidth = 3;
   for (const d of DISTRICTS) {
     const [x0, x1, z0, z1] = d.region;
-    const cx = X((x0 + x1) / 2), cz = Z((z0 + z1) / 2);
+    const cx = X((x0 + x1) / 2), cz = Z(z0 + 6);
     const tw = ctx.measureText(d.name).width;
-    ctx.strokeText(d.name, cx - tw / 2, cz);
-    ctx.fillText(d.name, cx - tw / 2, cz);
+    const [lx, ly] = clampLabel(cx - tw / 2, cz, tw);
+    ctx.strokeText(d.name, lx, ly);
+    ctx.fillText(d.name, lx, ly);
   }
   // POI labels.
   ctx.font = '11px Arial, sans-serif';
@@ -273,8 +302,9 @@ export function drawFullMap(view) {
   ];
   for (const [poi, name] of labels) {
     const tw = ctx.measureText(name).width;
-    ctx.strokeText(name, X(poi.x) - tw / 2, Z(poi.z) - 8);
-    ctx.fillText(name, X(poi.x) - tw / 2, Z(poi.z) - 8);
+    const [lx, ly] = clampLabel(X(poi.x) - tw / 2, Z(poi.z) - 8, tw);
+    ctx.strokeText(name, lx, ly);
+    ctx.fillText(name, lx, ly);
   }
   const collected = new Set(view.profile.postcards);
   POSTCARDS.forEach(([x, z], i) => {
@@ -373,7 +403,10 @@ export function showScreen(name) {
   for (const id of SCREENS) {
     if (el[id]) el[id].style.display = id === name ? 'flex' : 'none';
   }
-  if (el.hud) el.hud.style.display = (name === null || name === 'pause-screen') ? 'block' : (name ? 'none' : 'block');
+  // The HUD hides under every screen (pause included): the pause screen
+  // carries missions, stats and the map itself, and a HUD bleeding through
+  // the overlay reads as clutter.
+  if (el.hud) el.hud.style.display = name === null ? 'block' : 'none';
 }
 
 export function fillPauseScreen(view) {

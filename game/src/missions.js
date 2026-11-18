@@ -90,8 +90,8 @@ export const MISSIONS = [
     payout: 3000, rep: 2,
     stages: [
       { type: 'driveTo', x: POI.garage.x, z: POI.garage.z + 14, text: "Pick up Mara at the garage", next: 'Drive through Ciudad Vieja' },
-      { type: 'driveTo', x: -90, z: -75, text: 'Drive through Ciudad Vieja', next: 'Ambush!' },
-      { type: 'combat', x: -90, z: -75, count: 4, text: 'Ambush! Fight off the Vireo crew', next: 'Get Mara to the safehouse' },
+      { type: 'driveTo', x: -60, z: -100, text: 'Drive through Ciudad Vieja', next: 'Ambush!' },
+      { type: 'combat', x: -60, z: -100, count: 4, text: 'Ambush! Fight off the Vireo crew', next: 'Get Mara to the safehouse' },
       { type: 'driveTo', x: POI.safehouse.x, z: POI.safehouse.z + 10, text: "Get Mara to the safehouse", next: 'Mission complete' },
     ],
   },
