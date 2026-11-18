@@ -26,7 +26,9 @@ export function createProfile() {
       missionsPlayed: 0, timePlayed: 0, moneyEarned: 0,
     },
     // Where the player is (respawn point after load / wasted / busted).
-    spawn: { x: 15, z: -45, yaw: 0, inCar: false, carModel: 'taxi', carColor: 0 },
+    // On the street beside Theo's taxi — never inside a block staring at a
+    // wall: a fresh game must open on the road, the cab in front of the player.
+    spawn: { x: 18, z: -52, yaw: Math.PI, inCar: false, carModel: 'taxi', carColor: 0 },
     hour: 18.2,
     day: 1,
   };

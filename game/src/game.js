@@ -81,7 +81,7 @@ const missions = () => G.state.missions;
 
 // Player: on foot or in a car. Position is always world (x, z); y = 0.
 const player = {
-  x: 15, z: -45, yaw: 0, speed: 0, vx: 0, vz: 0,
+  x: 18, z: -52, yaw: Math.PI, speed: 0, vx: 0, vz: 0,
   hp: 100, inCar: false, car: null,
   phase: 0, dist: 0, walking: 0, aiming: 0, aimYaw: 0,
   reloadTimer: 0, fireTimer: 0, swing: 0, swingTimer: 0,
@@ -1656,7 +1656,7 @@ function wireScreens() {
   });
   $('btn-new').addEventListener('click', () => {
     G.state = createGameState();
-    player.x = 15; player.z = -45; player.yaw = 0;
+    player.x = 18; player.z = -52; player.yaw = Math.PI;
     player.hp = 100;
     updateMissionBeacon();
     startPlay();
