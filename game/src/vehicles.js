@@ -35,6 +35,14 @@ export const CAR_MODELS = {
     topSpeed: 40, accel: 14, grip: 3.4, colors: [[0.78, 0.13, 0.10], [0.10, 0.25, 0.60], [0.85, 0.55, 0.10]],
     value: 2500,
   },
+  muscle: {
+    name: 'Corsair V8', kind: 'muscle',
+    prof: [[2.5, 0.50], [2.2, 0.85], [0.7, 0.95], [-1.0, 0.95], [-2.2, 0.85], [-2.5, 0.55]],
+    sill: 0.26, wr: 0.38, wheelX: [1.6, -1.6], width: 1.0, topWidth: 0.78,
+    greenhouse: [0.9, 0.3, -0.9, -1.3, 1.25],
+    topSpeed: 38, accel: 13, grip: 3.0, colors: [[0.12, 0.12, 0.14], [0.85, 0.35, 0.10], [0.10, 0.45, 0.55]],
+    value: 2200,
+  },
   suv: {
     name: 'Bison 4x4', kind: 'suv',
     prof: [[2.4, 0.62], [2.1, 1.05], [0.9, 1.12], [-0.9, 1.12], [-2.1, 1.05], [-2.4, 0.65]],
@@ -236,6 +244,44 @@ export function buildWheel() {
   bd.setColor(0.80, 0.60, 0.20);
   bd.disc([0, 0, 0.29], [0, 0, 1], 0.12, 10);
   bd.disc([0, 0, -0.29], [0, 0, -1], 0.12, 10);
+  return bd.build();
+}
+
+// --- jet ski (rideable watercraft) --------------------------------------------
+// Nose at +X, origin at the waterline. The seat top sits at y = 0.58, which
+// is exactly where the seated character pose puts its hips (see
+// characters.js `sitting`), and the deck at y = 0.28 is where its feet rest.
+export function buildJetSki(color) {
+  const bd = new MeshBuilder();
+  // Hull: side profile extruded across the beam.
+  bd.setMat(MAT.PAINT).setColor(color[0], color[1], color[2]);
+  bd.extrude(
+    [[1.15, 0.10], [1.05, 0.42], [0.55, 0.30], [-0.6, 0.28], [-1.05, 0.32], [-1.15, 0.14], [-0.7, 0.06], [0.7, 0.04]],
+    -0.38, 0.38,
+  );
+  // White accent stripe along each flank, proud of the hull side.
+  bd.setMat(MAT.PAINT).setColor(0.95, 0.95, 0.95);
+  bd.quad([0.8, 0.16, 0.385], [-0.8, 0.16, 0.385], [-0.8, 0.22, 0.385], [0.8, 0.22, 0.385]);
+  bd.quad([-0.8, 0.16, -0.385], [0.8, 0.16, -0.385], [0.8, 0.22, -0.385], [-0.8, 0.22, -0.385]);
+  // Seat (dark, raised rear hump). The rider's feet rest on the deck
+  // ahead of the seat — no separate footwell pads (the deck rises
+  // toward the nose, so flat pads would sit inside the hull).
+  bd.setMat(MAT.PLAIN).setColor(0.10, 0.10, 0.12);
+  bd.box(-0.95, 0.28, -0.22, -0.15, 0.58, 0.22);
+  // Handlebar post + crossbar + grips.
+  bd.setMat(MAT.METAL).setColor(0.30, 0.30, 0.32);
+  bd.tube([0.55, 0.30, 0], [0.62, 0.72, 0], 0.04, 0.035, 6, true);
+  bd.tube([0.62, 0.72, -0.28], [0.62, 0.72, 0.28], 0.03, 0.03, 6, true);
+  bd.setMat(MAT.PLAIN).setColor(0.08, 0.08, 0.09);
+  bd.box(0.58, 0.69, -0.32, 0.66, 0.75, -0.24);
+  bd.box(0.58, 0.69, 0.24, 0.66, 0.75, 0.32);
+  // Small windshield, tilted back.
+  bd.setMat(MAT.GLASS).setColor(0.55, 0.70, 0.78);
+  bd.quad([0.78, 0.42, -0.2], [0.78, 0.42, 0.2], [0.68, 0.72, 0.2], [0.68, 0.72, -0.2]);
+  // Rear grab handle + jet nozzle.
+  bd.setMat(MAT.METAL).setColor(0.45, 0.45, 0.48);
+  bd.tube([-1.0, 0.34, -0.15], [-1.0, 0.34, 0.15], 0.03, 0.03, 5, true);
+  bd.tube([-1.16, 0.16, 0], [-1.28, 0.16, 0], 0.07, 0.06, 8, true);
   return bd.build();
 }
 

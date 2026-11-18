@@ -13,12 +13,12 @@ import {
   updateMesh, uploadBlob, uploadMesh,
 } from './render.js';
 import {
-  AVENUES, CITY, ISLAND, POI, POSTCARDS, STREETS, WATER_Z,
-  buildBeacon, buildFerrisWheel, buildPostcardMarker, buildWorld,
-  collideCircle, districtAt,
+  AVENUES, BOAT_SPOTS, CITY, ISLAND, POI, POSTCARDS, STREETS, TRAFFIC_LIGHTS, WATER_Z,
+  buildBeacon, buildFerrisWheel, buildPostcardMarker, buildTrafficLightLamps, buildWorld,
+  collideCircle, districtAt, lightPhase,
 } from './world.js';
 import {
-  CAR_MODELS, buildCarBody, buildCarGlass, buildHelicopter,
+  CAR_MODELS, buildCarBody, buildCarGlass, buildHelicopter, buildJetSki,
   buildLightBar, buildWheel,
 } from './vehicles.js';
 import { CHAR, GAIT_K, MARA_LOOK, THEO_LOOK, buildCharacter, muzzlePos, randomLook } from './characters.js';
@@ -74,6 +74,10 @@ const G = {
   camera: { yaw: 0, pitch: 0.35, dist: 8, fov: 60, orbit: 0 },
   freezeT: null, // set in ?shot= mode: render one frozen frame
   shotName: null,
+  lightOverrides: {}, // "x,z" -> forced phase name (screenshot staging)
+  redLightFlag: null, // intersection last flagged for running a red light
+  photoMode: false, // photo mode: world frozen, free camera, filters
+  photoCam: null, // { yaw, pitch, dist, target: [x, y, z] }
 };
 
 const profile = () => G.state.profile;
@@ -83,6 +87,7 @@ const missions = () => G.state.missions;
 const player = {
   x: 18, z: -52, yaw: Math.PI, speed: 0, vx: 0, vz: 0,
   hp: 100, armor: 50, inCar: false, car: null,
+  onJetSki: false, jetski: null, // riding a jet ski (player.x/z follow it)
   phase: 0, dist: 0, walking: 0, aiming: 0, aimYaw: 0,
   reloadTimer: 0, fireTimer: 0, swing: 0, swingTimer: 0,
   flashTimer: 0, flashAt: null, tracerTimer: 0, tracerFrom: null, tracerTo: null,
@@ -90,10 +95,26 @@ const player = {
 
 // --- entities -----------------------------------------------------------------
 const cars = []; // { model, color, x, z, yaw, speed, steer, spin, hp, kind, ai }
-const peds = []; // { look, x, z, yaw, speed, phase, dist, path, pathI, flee, hp, dead, deadT }
+const peds = []; // { look, x, z, yaw, speed, phase, dist, path, pathI, flee, hp, dead, deadT, cross, walking }
 const enemies = []; // { look, x, z, yaw, hp, weapon, state, fireTimer, kind, dead, deadT, phase, dist }
 const pickups = []; // { kind: 'ammo', weapon, x, z, t }
 const tracers = []; // transient, drawn for 60ms
+const jetskis = []; // { x, z, yaw, speed, steer, colorIdx, bobPhase, wakeT }
+const wakePuffs = []; // { x, z, t, s } fading foam discs behind a moving jet ski
+
+// Traffic-light lookup by "x,z" key (the stop + crosswalk checks run per frame).
+const LIGHT_BY_KEY = new Map(TRAFFIC_LIGHTS.map((l) => [l.x + ',' + l.z, l]));
+const JETSKI_COLORS = [[0.85, 0.15, 0.12], [0.15, 0.45, 0.85], [1.0, 0.75, 0.15], [0.10, 0.70, 0.60]];
+
+// Photo-mode filters (CSS filters on the canvas — free, instant, no shader work).
+const PHOTO_FILTERS = [
+  { name: 'NONE', css: 'none' },
+  { name: 'GOLDEN', css: 'sepia(0.25) saturate(1.3) contrast(1.05)' },
+  { name: 'NOIR', css: 'grayscale(1) contrast(1.15) brightness(1.05)' },
+  { name: 'VIVID', css: 'saturate(1.6) contrast(1.08)' },
+  { name: 'TEAL', css: 'hue-rotate(-15deg) saturate(1.2) contrast(1.05)' },
+];
+let photoFilterIdx = 0;
 
 // Mesh caches.
 const carBodyCache = new Map(); // "model:colorIdx" -> mesh
@@ -114,6 +135,9 @@ let carBlobMesh = null;
 let charBlobMesh = null;
 let spotBlobMesh = null;
 let rainMesh = null;
+let lightLampMesh = null; // dynamic traffic-light lamps (one mesh, all heads)
+let lightLampSig = ''; // phase signature the lamp mesh was built from
+let jetskiMeshes = []; // one mesh per JETSKI_COLORS entry
 let colliders = [];
 let charMeshes = new Map(); // entity -> dynamic mesh
 
@@ -153,15 +177,32 @@ function spawnCar(model, colorIdx, x, z, yaw, kind, ai) {
   return car;
 }
 
-function spawnPed(x, z, path) {
+function spawnPed(x, z, path, opts) {
   const ped = {
-    look: randomLook(Math.floor(Math.random() * 100000), 'ped'),
+    look: randomLook(Math.floor(Math.random() * 100000), (opts && opts.kind) || 'ped'),
     x, z, yaw: Math.random() * TAU, speed: 1.2 + Math.random() * 0.5,
     phase: Math.random() * 10, dist: 0, path, pathI: 0,
     flee: 0, hp: 50, dead: false, deadT: 0,
+    cross: (opts && opts.cross) || null, // { av, st }: crosswalk user (waits on red)
+    walking: 1,
   };
   peds.push(ped);
   return ped;
+}
+
+// A pedestrian who crosses the avenue at a signaled intersection's painted
+// crosswalk (z = st - 5), waiting on the kerb while avenue traffic is green.
+function spawnCrossingPed(av, st) {
+  return spawnPed(av - 8, st - 5, [[av - 8, st - 5], [av + 8, st - 5]], { cross: { av, st } });
+}
+
+function spawnJetSki(x, z, yaw, colorIdx) {
+  const ski = {
+    x, z, yaw, speed: 0, steer: 0,
+    colorIdx: colorIdx || 0, bobPhase: Math.random() * TAU, wakeT: 0,
+  };
+  jetskis.push(ski);
+  return ski;
 }
 
 function spawnEnemy(x, z, kind, weapon) {
@@ -223,9 +264,14 @@ function initWorld() {
   charBlobMesh = uploadBlob(discBlob(0.55, 0.45, 16));
   spotBlobMesh = uploadBlob(discBlob(5, 5, 24));
   rainMesh = uploadMesh(new MeshBuilder().build(), true);
+  // Traffic-light lamps: one dynamic mesh, rebuilt whenever any phase flips.
+  lightLampMesh = uploadMesh(buildTrafficLightLamps(0, G.lightOverrides).build(), true);
+  lightLampSig = lightSignature(0);
+  // Jet skis: one mesh per colour.
+  jetskiMeshes = JETSKI_COLORS.map((c) => uploadMesh(buildJetSki(c), false));
   // Parked cars along the streets (stealable).
   const rng = rng32(99);
-  const models = ['sedan', 'sedan', 'coupe', 'suv', 'van', 'taxi'];
+  const models = ['sedan', 'sedan', 'coupe', 'muscle', 'suv', 'van', 'taxi'];
   for (let i = 0; i < 12; i++) {
     const av = AVENUES[Math.floor(rng() * AVENUES.length)];
     const z = -95 + rng() * 185;
@@ -249,6 +295,22 @@ function initWorld() {
     ];
     spawnPed(sx, sz, path);
   }
+  // Crosswalk users: they cross at the painted stripes and wait on the
+  // kerb while their road is green.
+  spawnCrossingPed(0, 50);
+  spawnCrossingPed(60, 0);
+  spawnCrossingPed(-60, 50);
+  spawnCrossingPed(60, 100);
+  // Beachgoers strolling the sand (bright swim colours, sunhats).
+  spawnPed(20, 115, [[20, 115], [60, 118]], { kind: 'beach' });
+  spawnPed(70, 116, [[70, 116], [110, 117]], { kind: 'beach' });
+  spawnPed(-40, 114, [[-40, 114], [-10, 117]], { kind: 'beach' });
+  spawnPed(100, 120, [[100, 120], [130, 118]], { kind: 'beach' });
+  // Jet skis moored at the waterline, facing the open bay.
+  spawnJetSki(24, 142.5, -Math.PI / 2, 0);
+  spawnJetSki(44, 143.5, -Math.PI / 2, 1);
+  spawnJetSki(-36, 142.5, -Math.PI / 2, 2);
+  spawnJetSki(10, 145.5, -Math.PI / 2, 3);
   updateMissionBeacon();
 }
 
@@ -547,6 +609,8 @@ function respawnPlayer() {
   player.yaw = 0;
   player.inCar = false;
   player.car = null;
+  player.onJetSki = false;
+  player.jetski = null;
   player.speed = 0;
   G.mode = 'play';
   G.camera.yaw = player.yaw;
@@ -580,6 +644,110 @@ function exitCar() {
   player.z = car.z + rz * 2.2;
   player.yaw = car.yaw;
   player.speed = 0;
+}
+
+// --- jet ski ----------------------------------------------------------------
+
+function enterJetSki(ski) {
+  player.onJetSki = true;
+  player.jetski = ski;
+  player.x = ski.x;
+  player.z = ski.z;
+  player.yaw = ski.yaw;
+  G.camera.yaw = ski.yaw;
+}
+
+function exitJetSki() {
+  const ski = player.jetski;
+  if (!ski) return;
+  if (ski.z < 152) {
+    // Mainland beach: step onto the sand just above the waterline, and
+    // beach the ski at the waterline so it stays boardable.
+    player.x = ski.x;
+    player.z = 138.5;
+    player.yaw = Math.PI / 2; // face the city
+    ski.z = 141.5;
+  } else if (ski.z > 154 && Math.abs(ski.x) < 64) {
+    // Isla Verde's north shore.
+    player.x = ski.x;
+    player.z = 159.5;
+    player.yaw = -Math.PI / 2; // face the island
+    ski.z = 156.5;
+  } else {
+    toast('Too far from shore — ride closer to the beach to get off.');
+    return;
+  }
+  player.onJetSki = false;
+  player.jetski = null;
+  player.speed = 0;
+  ski.speed = 0;
+  sfxClick();
+}
+
+function updateJetSki(dt) {
+  const input = G.input;
+  const ski = player.jetski;
+  if (!ski) return;
+  const steerInput = (input.down('KeyA') ? 1 : 0) - (input.down('KeyD') ? 1 : 0);
+  ski.steer = damp(ski.steer, steerInput, 6, dt);
+  if (input.down('KeyW')) ski.speed += 12 * dt;
+  if (input.down('KeyS')) ski.speed -= (ski.speed > 0.5 ? 14 : 6) * dt;
+  if (!input.down('KeyW') && !input.down('KeyS')) ski.speed = damp(ski.speed, 0, 0.5, dt);
+  ski.speed = clamp(ski.speed, -4, 26);
+  ski.yaw += ski.steer * clamp(Math.abs(ski.speed) / 8, 0, 1.4) * dt * (ski.speed < 0 ? -1 : 1);
+  const fx = Math.cos(ski.yaw), fz = -Math.sin(ski.yaw);
+  let nx = ski.x + fx * ski.speed * dt;
+  let nz = ski.z + fz * ski.speed * dt;
+  // Water bounds: the bay, minus the island and the causeway.
+  nx = clamp(nx, -168, 168);
+  nz = clamp(nz, 141, 198);
+  // Island block (north shore z = 158, radius 1.2): push out along the
+  // smallest side so the ski slides around the coast.
+  if (nx > -67.2 && nx < 67.2 && nz > 156.8) {
+    const pl = nx + 67.2, pr = 67.2 - nx, pt = nz - 156.8;
+    if (pt <= pl && pt <= pr) { nz = 156.8; ski.speed *= 0.5; }
+    else if (pl < pr) { nx = -67.2; ski.speed *= 0.5; }
+    else { nx = 67.2; ski.speed *= 0.5; }
+  }
+  // Causeway block (|x| < 5.4, z < 159.2): the road slab crosses the bay.
+  if (Math.abs(nx) < 5.4 && nz < 159.2 && nz > 140) {
+    const pl = nx + 5.4, pr = 5.4 - nx, pb = 159.2 - nz;
+    if (pb <= pl && pb <= pr) { nz = 159.2; ski.speed *= 0.5; }
+    else if (pl < pr) { nx = -5.4; ski.speed *= 0.5; }
+    else { nx = 5.4; ski.speed *= 0.5; }
+  }
+  // Anchored boats: soft push-out circles.
+  for (const b of BOAT_SPOTS) {
+    const dx = nx - b.x, dz = nz - b.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 3.4 && d > 0.01) {
+      nx = b.x + (dx / d) * 3.4;
+      nz = b.z + (dz / d) * 3.4;
+      ski.speed *= 0.6;
+    }
+  }
+  ski.x = nx;
+  ski.z = nz;
+  profile().stats.distanceDriven += Math.abs(ski.speed) * dt;
+  player.x = ski.x;
+  player.z = ski.z;
+  player.yaw = ski.yaw;
+  player.speed = Math.abs(ski.speed);
+  // Wake: a fading foam puff at the stern while moving.
+  ski.wakeT -= dt;
+  if (Math.abs(ski.speed) > 6 && ski.wakeT <= 0) {
+    ski.wakeT = 0.07;
+    wakePuffs.push({
+      x: ski.x - fx * 1.4, z: ski.z - fz * 1.4,
+      t: G.time, s: 0.9 + Math.abs(ski.speed) * 0.03,
+    });
+    if (wakePuffs.length > 40) wakePuffs.shift();
+  }
+  // Camera follows behind the ski.
+  const wantYaw = ski.yaw;
+  G.camera.yaw = G.camera.yaw + wrapAngle(wantYaw - G.camera.yaw) * Math.min(1, 3.5 * dt);
+  if (input.locked) G.camera.yaw -= input.mouseDX * 0.002;
+  G.camera.pitch = damp(G.camera.pitch, 0.30, 4, dt);
 }
 
 function updateDriving(dt) {
@@ -652,6 +820,26 @@ function updateDriving(dt) {
   player.z = car.z;
   player.yaw = car.yaw;
   player.speed = Math.abs(car.speed);
+  // Running a red light draws heat — once per intersection, only when a
+  // cop is close or the player is already wanted.
+  for (const light of TRAFFIC_LIGHTS) {
+    if (Math.abs(car.x - light.x) < 4.5 && Math.abs(car.z - light.z) < 4.5) {
+      const dir = Math.abs(Math.sin(car.yaw)) > 0.7 ? 'ns' : 'ew';
+      const key = light.x + ',' + light.z;
+      if (lightPhase(light, G.time, G.lightOverrides)[dir] === 'red' && G.redLightFlag !== key) {
+        G.redLightFlag = key;
+        const nearCop = G.police.units.some((u) => v3.dist2([u.x, 0, u.z], [car.x, 0, car.z]) < 60);
+        if (nearCop || G.police.wanted > 0) {
+          addHeat(G.police, CRIME_HEAT.redLight, G.gameTime);
+          toast('You ran a red light.');
+        }
+      }
+    }
+  }
+  // Clear the flag once the car leaves every intersection box.
+  if (!TRAFFIC_LIGHTS.some((l) => Math.abs(car.x - l.x) < 4.5 && Math.abs(car.z - l.z) < 4.5)) {
+    G.redLightFlag = null;
+  }
   // Camera follows behind the car (drift-aware: aims at car angle + slide).
   const slide = clamp(car.steer * Math.abs(car.speed) / 20, -1, 1);
   const wantYaw = car.yaw + slide * 0.4;
@@ -659,6 +847,36 @@ function updateDriving(dt) {
   if (input.locked) G.camera.yaw -= input.mouseDX * 0.002;
   G.camera.pitch = damp(G.camera.pitch, 0.30, 4, dt);
   if (input.hit('KeyH')) sfxHorn();
+}
+
+// --- traffic lights ---------------------------------------------------------
+// Phase signature: one letter per intersection ('g'/'y'/'r' for the NS
+// direction). The lamp mesh rebuilds only when the signature changes, so
+// the 40 lamp heads cost one upload per phase flip.
+function lightSignature(t) {
+  return TRAFFIC_LIGHTS.map((l) => {
+    const p = lightPhase(l, t, G.lightOverrides);
+    return p.ns === 'green' ? 'g' : p.ns === 'yellow' ? 'y' : 'r';
+  }).join('');
+}
+
+function refreshLightLamps(t) {
+  const sig = lightSignature(t);
+  if (sig !== lightLampSig) {
+    lightLampSig = sig;
+    updateMesh(lightLampMesh, buildTrafficLightLamps(t, G.lightOverrides).build());
+  }
+}
+
+// Must a car travelling in `dir` ('ns' | 'ew') stop at intersection (av, st)?
+// Red always stops; yellow stops only when far enough to stop comfortably.
+function mustStopAtLight(av, st, dir, distToStopLine, t) {
+  const light = LIGHT_BY_KEY.get(av + ',' + st);
+  if (!light) return false;
+  const phase = lightPhase(light, t, G.lightOverrides)[dir];
+  if (phase === 'red') return true;
+  if (phase === 'yellow') return distToStopLine > 6;
+  return false;
 }
 
 // ============================================================================
@@ -671,9 +889,48 @@ function updateTraffic(dt) {
     const model = CAR_MODELS[car.model];
     // Drive along the current road; at intersections, sometimes turn.
     car.speed = damp(car.speed, ai.speed, 2, dt);
+    // Traffic lights: stop at the stop line on red (or on yellow when far
+    // enough to stop comfortably). The stop line sits 7.5 units before the
+    // intersection centre, clear of the crosswalk.
+    const alongZ = Math.abs(Math.sin(car.yaw)) > 0.7;
+    let stopAt = null; // { axis: 'x'|'z', line, dir }
+    if (alongZ) {
+      const av = AVENUES.find((a) => Math.abs(car.x - a) < 2);
+      const dirZ = Math.sign(-Math.sin(car.yaw)) || 1;
+      if (av !== undefined) {
+        const st = STREETS.find((s) => (s - car.z) * dirZ > 0 && Math.abs(s - car.z) < 16);
+        if (st !== undefined) {
+          const line = st - dirZ * 7.5;
+          const dist = (line - car.z) * dirZ;
+          if (dist > 0 && mustStopAtLight(av, st, 'ns', dist, G.time)) {
+            stopAt = { axis: 'z', line, dir: dirZ };
+          }
+        }
+      }
+    } else {
+      const st = STREETS.find((s) => Math.abs(car.z - s) < 2);
+      const dirX = Math.sign(Math.cos(car.yaw)) || 1;
+      if (st !== undefined) {
+        const av = AVENUES.find((a) => (a - car.x) * dirX > 0 && Math.abs(a - car.x) < 16);
+        if (av !== undefined) {
+          const line = av - dirX * 7.5;
+          const dist = (line - car.x) * dirX;
+          if (dist > 0 && mustStopAtLight(av, st, 'ew', dist, G.time)) {
+            stopAt = { axis: 'x', line, dir: dirX };
+          }
+        }
+      }
+    }
+    if (stopAt) car.speed = damp(car.speed, 0, 6, dt);
     const fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw);
-    const nx = car.x + fx * car.speed * dt;
-    const nz = car.z + fz * car.speed * dt;
+    let nx = car.x + fx * car.speed * dt;
+    let nz = car.z + fz * car.speed * dt;
+    // Never creep past the stop line.
+    if (stopAt) {
+      if (stopAt.axis === 'z') {
+        if ((nz - stopAt.line) * stopAt.dir > 0) { nz = stopAt.line; car.speed = 0; }
+      } else if ((nx - stopAt.line) * stopAt.dir > 0) { nx = stopAt.line; car.speed = 0; }
+    }
     // Slow for the car ahead.
     for (const other of cars) {
       if (other === car) continue;
@@ -726,6 +983,22 @@ function updatePeds(dt) {
       tx = wp[0]; tz = wp[1];
       if (Math.hypot(tx - pd.x, tz - pd.z) < 2) pd.pathI = (pd.pathI + 1) % pd.path.length;
     }
+    // Crosswalk rule: a crossing ped waits on the kerb while avenue
+    // traffic has the green — they cross only on the avenue's red.
+    let waiting = false;
+    if (pd.cross && pd.flee <= 0) {
+      const { av, st } = pd.cross;
+      const wp = pd.path[pd.pathI];
+      const headingAcross = Math.sign(wp[0] - av) !== Math.sign(pd.x - av);
+      if (headingAcross && Math.abs(pd.x - av) > 4.5) {
+        const light = LIGHT_BY_KEY.get(av + ',' + st);
+        if (light && lightPhase(light, G.time, G.lightOverrides).ns !== 'red') {
+          waiting = true;
+        }
+      }
+    }
+    if (waiting) speed = 0;
+    pd.walking = waiting ? 0 : 1;
     const dx = tx - pd.x, dz = tz - pd.z;
     const d = Math.hypot(dx, dz);
     const wantYaw = Math.atan2(-dz, dx);
@@ -1002,6 +1275,7 @@ function updateMission(dt) {
 // ============================================================================
 function nearestInteraction() {
   if (player.inCar) return { type: 'exit-car', label: 'Press E — Exit car' };
+  if (player.onJetSki) return { type: 'exit-jetski', label: 'Press E — Get off Jet Ski' };
   // Nearest car to enter.
   let bestCar = null, bestD = 4;
   for (const car of cars) {
@@ -1011,6 +1285,13 @@ function nearestInteraction() {
   }
   if (bestCar) {
     return { type: 'enter-car', car: bestCar, label: 'Press E — Drive ' + CAR_MODELS[bestCar.model].name };
+  }
+  // Jet skis moored at the waterline.
+  for (const ski of jetskis) {
+    const d = Math.hypot(ski.x - player.x, ski.z - player.z);
+    if (d < 4.5) {
+      return { type: 'jetski', ski, label: 'Press E — Ride Jet Ski' };
+    }
   }
   // Mission beacon.
   if (G.missionBeacon) {
@@ -1038,6 +1319,11 @@ function doInteract() {
   if (!t) return;
   if (t.type === 'exit-car') {
     exitCar();
+    sfxClick();
+  } else if (t.type === 'exit-jetski') {
+    exitJetSki();
+  } else if (t.type === 'jetski') {
+    enterJetSki(t.ski);
     sfxClick();
   } else if (t.type === 'enter-car') {
     const stolen = t.car.kind === 'parked';
@@ -1256,9 +1542,13 @@ function hudView() {
   const loadout = profile().loadout;
   const w = WEAPONS[loadout.current];
   const slot = loadout.owned[loadout.current];
-  const hint = player.inCar
-    ? 'WASD drive · SPACE brake · SHIFT nitro · E exit · H horn · Z repair · X fence · M map'
-    : 'WASD move · Click shoot · RMB aim · 1-5 weapons · R reload · E use · M map';
+  // Hints stay short (≤ ~60 chars): the 264px corner wraps at ~44 chars,
+  // and a third line crowds the speedo. Photo mode lives in HOW TO PLAY.
+  const hint = player.onJetSki
+    ? 'WASD ride · E get off · M map'
+    : player.inCar
+      ? 'WASD drive · SPACE brake · SHIFT nitro · E exit · H horn · M map'
+      : 'WASD move · Click shoot · RMB aim · 1-5 weapons · R reload · E use · M map';
   // Live helicopter distance for the response panel.
   if (G.police.heli) {
     G.police.heliDist = Math.round(
@@ -1284,12 +1574,21 @@ function hudView() {
     mag: w.melee ? 0 : slot.mag,
     reserve: w.melee ? 0 : slot.reserve,
     loadout,
-    inCar: player.inCar,
-    speed: player.inCar && player.car ? Math.abs(player.car.speed) : player.speed,
-    carName: player.inCar && player.car ? CAR_MODELS[player.car.model].name : '',
-    carHp: player.inCar && player.car ? player.car.hp : 100,
+    inCar: player.inCar || player.onJetSki,
+    onJetSki: player.onJetSki,
+    speed: player.onJetSki && player.jetski
+      ? Math.abs(player.jetski.speed)
+      : player.inCar && player.car ? Math.abs(player.car.speed) : player.speed,
+    carName: player.onJetSki
+      ? 'Sea Dart Jet Ski'
+      : player.inCar && player.car ? CAR_MODELS[player.car.model].name : '',
+    carHp: player.onJetSki ? null : player.inCar && player.car ? player.car.hp : 100,
     health: player.hp,
     armor: player.armor,
+    lights: TRAFFIC_LIGHTS.map((l) => {
+      const p = lightPhase(l, G.time, G.lightOverrides);
+      return { x: l.x, z: l.z, ns: p.ns, ew: p.ew };
+    }),
     enemies: enemies.filter((e) => !e.dead).map((e) => ({ x: e.x, z: e.z, kind: e.kind })),
     playTime: formatPlayTime(G.gameTime),
     aiming: player.aiming > 0.3 && !player.inCar,
@@ -1303,6 +1602,16 @@ function hudView() {
 // ============================================================================
 function updateCamera(dt) {
   const cam = G.camera;
+  // Photo mode: the free orbit camera (world frozen).
+  if (G.photoMode && G.photoCam) {
+    const pc = G.photoCam;
+    const bx = pc.target[0] - Math.cos(pc.yaw) * Math.cos(pc.pitch) * pc.dist;
+    const bz = pc.target[2] + Math.sin(pc.yaw) * Math.cos(pc.pitch) * pc.dist;
+    camPos[0] = bx;
+    camPos[1] = Math.max(0.6, pc.target[1] + Math.sin(pc.pitch) * pc.dist);
+    camPos[2] = bz;
+    return { target: pc.target, fov: 55 };
+  }
   if (G.mode === 'title') {
     // Slow drift along the sand at the west end of the beachfront,
     // looking east: the billboard FACES, the Wheel, palms, umbrellas
@@ -1328,6 +1637,20 @@ function updateCamera(dt) {
     cam.fov = damp(cam.fov, fov, 4, dt);
     return { target: [car.x + Math.cos(car.yaw) * 2, 1.6, car.z - Math.sin(car.yaw) * 2], fov: cam.fov };
   }
+  if (player.onJetSki && player.jetski) {
+    const ski = player.jetski;
+    const speed = Math.abs(ski.speed);
+    const dist = 6.5 + speed * 0.06;
+    const height = 2.4 + speed * 0.01;
+    const bx = ski.x - Math.cos(cam.yaw) * dist;
+    const bz = ski.z + Math.sin(cam.yaw) * dist;
+    camPos[0] = damp(camPos[0], bx, 6, dt);
+    camPos[1] = damp(camPos[1], height, 6, dt);
+    camPos[2] = damp(camPos[2], bz, 6, dt);
+    const fov = 60 + Math.min(14, speed * 0.4);
+    cam.fov = damp(cam.fov, fov, 4, dt);
+    return { target: [ski.x + Math.cos(ski.yaw) * 2, 1.2, ski.z - Math.sin(ski.yaw) * 2], fov: cam.fov };
+  }
   // On foot: third person behind the camera yaw.
   const dist = player.aiming > 0.5 ? 3.4 : 5.6;
   const height = 2.0 + Math.sin(cam.pitch) * 2.2;
@@ -1345,6 +1668,94 @@ function updateCamera(dt) {
   const fov = player.aiming > 0.5 ? 50 : 62;
   cam.fov = damp(cam.fov, fov, 8, dt);
   return { target: [player.x, 1.4, player.z], fov: cam.fov };
+}
+
+// --- photo mode ---------------------------------------------------------------
+// Freezes the world and hands the player an orbit camera with five filters.
+// Enter with P from play mode; exit with P. The HUD is hidden while active
+// and the control bar hides with H for a clean frame.
+function enterPhotoMode() {
+  if (G.mode !== 'play') return;
+  G.photoMode = true;
+  photoFilterIdx = 0;
+  canvas.style.filter = 'none';
+  G.photoCam = {
+    yaw: G.camera.yaw, pitch: 0.35, dist: 8,
+    target: [player.x, 1.5, player.z],
+  };
+  document.getElementById('hud').style.display = 'none';
+  const bar = document.getElementById('photo-bar');
+  if (bar) {
+    bar.style.display = 'block';
+    updatePhotoBar();
+  }
+  requestPointerLock(canvas);
+  sfxClick();
+}
+
+function exitPhotoMode() {
+  G.photoMode = false;
+  G.photoCam = null;
+  canvas.style.filter = 'none';
+  document.getElementById('hud').style.display = 'block';
+  const bar = document.getElementById('photo-bar');
+  if (bar) bar.style.display = 'none';
+  exitPointerLock();
+  sfxClick();
+}
+
+function updatePhotoBar() {
+  const name = document.getElementById('photo-filter');
+  if (name) name.textContent = PHOTO_FILTERS[photoFilterIdx].name;
+}
+
+function updatePhotoMode(dt) {
+  const input = G.input;
+  const pc = G.photoCam;
+  if (!pc) return;
+  if (input.hit('KeyP')) {
+    exitPhotoMode();
+    return;
+  }
+  if (input.hit('KeyH')) {
+    const bar = document.getElementById('photo-bar');
+    if (bar) bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
+  }
+  for (let i = 0; i < PHOTO_FILTERS.length; i++) {
+    if (input.hit('Digit' + (i + 1))) {
+      photoFilterIdx = i;
+      canvas.style.filter = PHOTO_FILTERS[i].css;
+      updatePhotoBar();
+      sfxClick();
+    }
+  }
+  // Click re-locks the pointer after Esc released it (Esc exits pointer lock
+  // without reaching the page, so P stays the reliable exit).
+  if (input.mousePressed && !input.locked) requestPointerLock(canvas);
+  // Orbit with the mouse, zoom with the wheel, WASD glides the orbit target.
+  if (input.locked) {
+    pc.yaw -= input.mouseDX * 0.0028;
+    pc.pitch = clamp(pc.pitch + input.mouseDY * 0.0022, -0.05, 1.2);
+  }
+  if (input.wheel !== 0) {
+    pc.dist = clamp(pc.dist + input.wheel * 1.2, 3, 30);
+  }
+  const fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw);
+  const rx = -fz, rz = fx; // right vector
+  let mx = 0, mz = 0;
+  if (input.down('KeyW')) { mx += fx; mz += fz; }
+  if (input.down('KeyS')) { mx -= fx; mz -= fz; }
+  if (input.down('KeyD')) { mx += rx; mz += rz; }
+  if (input.down('KeyA')) { mx -= rx; mz -= rz; }
+  if (mx !== 0 || mz !== 0) {
+    const len = Math.hypot(mx, mz);
+    pc.target[0] += (mx / len) * 8 * dt;
+    pc.target[2] += (mz / len) * 8 * dt;
+    pc.target[0] = clamp(pc.target[0], -170, 170);
+    pc.target[2] = clamp(pc.target[2], -150, 240);
+  }
+  if (input.down('KeyR')) pc.target[1] = clamp(pc.target[1] + 6 * dt, 0.5, 30);
+  if (input.down('KeyF')) pc.target[1] = clamp(pc.target[1] - 6 * dt, 0.5, 30);
 }
 
 // ============================================================================
@@ -1426,6 +1837,10 @@ function renderFrame(t) {
   // Static world (merged chunks).
   for (const mesh of staticMeshes) drawLit(mesh, IDENT, vp, t, 1);
 
+  // Traffic-light lamps (one dynamic mesh, rebuilt when a phase flips).
+  refreshLightLamps(t);
+  drawLit(lightLampMesh, IDENT, vp, t, 1);
+
   // Ferris wheel (rotates slowly around its axle). The wheel mesh is built in
   // the XY plane with the axle along Z, matching the support towers.
   {
@@ -1480,8 +1895,42 @@ function renderFrame(t) {
     drawBlob(carBlobMesh, m4.multiply(vp, frame(car.x, 0.04, car.z, car.yaw, 0, 0, 1)), [0.05, 0.03, 0.02, 0.38]);
   }
 
-  // Player character (on foot only).
-  if (!player.inCar) {
+  // Jet skis (bobbing on the swell, pitching with speed, rolling in turns).
+  // The hull frame sits at y = -0.38 so the keel rides in the water plane.
+  for (const ski of jetskis) {
+    const bobY = Math.sin(t * 1.6 + ski.x * 0.15 + ski.bobPhase) * 0.07;
+    const pitch = Math.sin(t * 1.3 + ski.z * 0.1 + ski.bobPhase) * 0.03
+      + clamp(ski.speed * 0.003, 0, 0.06);
+    const roll = -ski.steer * clamp(Math.abs(ski.speed) / 20, 0, 1) * 0.12;
+    const skiM = frame(ski.x, -0.38 + bobY, ski.z, ski.yaw, pitch, roll, 1);
+    drawLit(jetskiMeshes[ski.colorIdx % jetskiMeshes.length], skiM, m4.multiply(vp, skiM), t, 1);
+    drawBlob(carBlobMesh, m4.multiply(vp, frame(ski.x, -0.35, ski.z, ski.yaw, 0, 0, 1)), [0.02, 0.05, 0.08, 0.25]);
+  }
+  // Wake foam: fading white discs that grow as they age.
+  for (let i = wakePuffs.length - 1; i >= 0; i--) {
+    const w = wakePuffs[i];
+    const age = t - w.t;
+    if (age > 1.4) { wakePuffs.splice(i, 1); continue; }
+    const a = 0.45 * (1 - age / 1.4);
+    const s = (w.s + age * 1.2) / 5; // spotBlobMesh is a 5-unit disc
+    drawBlob(spotBlobMesh, m4.multiply(vp, frame(w.x, -0.35, w.z, 0, 0, 0, s)), [1, 1, 1, a]);
+  }
+
+  // Player on the jet ski: seated, hands on the bars, bobbing with the hull.
+  if (player.onJetSki && player.jetski) {
+    const ski = player.jetski;
+    const bobY = Math.sin(t * 1.6 + ski.x * 0.15 + ski.bobPhase) * 0.07;
+    const pitch = Math.sin(t * 1.3 + ski.z * 0.1 + ski.bobPhase) * 0.03
+      + clamp(ski.speed * 0.003, 0, 0.06);
+    const roll = -ski.steer * clamp(Math.abs(ski.speed) / 20, 0, 1) * 0.12;
+    const mesh = charMeshFor(player, THEO_LOOK, {
+      phase: 0, walking: 0, breathe: 1, breathT: t * 1.6,
+      aiming: 0, weapon: null, swing: 0, sitting: 1,
+    });
+    const chM = frame(ski.x, -0.38 + bobY, ski.z, ski.yaw, pitch, roll, 1);
+    drawLit(mesh, chM, m4.multiply(vp, chM), t, 1);
+  } else if (!player.inCar) {
+    // Player character (on foot).
     const mesh = charMeshFor(player, THEO_LOOK, {
       phase: player.phase, walking: player.walking,
       breathe: 1 - player.walking * 0.85, breathT: t * 1.6,
@@ -1504,7 +1953,7 @@ function renderFrame(t) {
   for (const pd of peds) {
     if (pd.dead && G.time - pd.deadT > 8) continue;
     const mesh = charMeshFor(pd, pd.look, {
-      phase: pd.phase, walking: pd.dead ? 0 : 1,
+      phase: pd.phase, walking: pd.dead ? 0 : (pd.walking === undefined ? 1 : pd.walking),
       breathe: 1, breathT: t * 1.6 + pd.x, aiming: 0, weapon: null, swing: 0,
     });
     const fall = pd.dead ? Math.min(1, (G.time - pd.deadT) * 3) : 0;
@@ -1578,6 +2027,11 @@ function renderFrame(t) {
 // Frame loop
 // ============================================================================
 function update(dt) {
+  // Photo mode: the world is frozen; only the orbit camera moves.
+  if (G.photoMode) {
+    updatePhotoMode(dt);
+    return;
+  }
   G.time += dt;
   if (G.mode === 'play' || G.mode === 'choice') G.gameTime += dt;
   updateWeather(dt);
@@ -1624,6 +2078,7 @@ function update(dt) {
   }
 
   if (player.inCar) updateDriving(dt);
+  else if (player.onJetSki) updateJetSki(dt);
   else updateOnFoot(dt);
   updateTraffic(dt);
   updatePeds(dt);
@@ -1680,6 +2135,7 @@ function update(dt) {
     nextStation();
     toast(currentStation().name + ' — ' + currentTrack());
   }
+  if (G.input.hit('KeyP')) enterPhotoMode();
   if (G.input.hit('KeyZ')) maraRepair();
   if (G.input.hit('KeyX')) zedFence();
   // Click the canvas to lock the mouse for aiming.
@@ -1789,6 +2245,8 @@ function wireScreens() {
       player.x = saved.profile.spawn.x;
       player.z = saved.profile.spawn.z;
       player.yaw = saved.profile.spawn.yaw;
+      player.onJetSki = false;
+      player.jetski = null;
       G.hour = saved.profile.hour;
       G.day = saved.profile.day;
       updateMissionBeacon();
@@ -1801,6 +2259,8 @@ function wireScreens() {
     player.x = 18; player.z = -52; player.yaw = Math.PI;
     player.hp = 100;
     player.armor = 50;
+    player.onJetSki = false;
+    player.jetski = null;
     updateMissionBeacon();
     startPlay();
   });
@@ -1947,6 +2407,13 @@ function boot() {
       document.getElementById('hud').style.display = 'block';
       updateHUD(hudView());
     }
+    // ?live=1: keep the staged scene running instead of stopping — the
+    // staged state becomes playable (e.g. riding the jet ski from
+    // ?shot=jetski&live=1). Without it, shot mode renders one frame.
+    if (params.has('live')) {
+      showScreen(null);
+      requestAnimationFrame(frameLoop);
+    }
     return;
   }
 
@@ -1969,6 +2436,22 @@ function shotApi() {
       const ped = spawnPed(x, z, [[x, z], [x + 6, z + 2]]);
       ped.yaw = yaw !== undefined ? yaw : Math.PI / 2;
       return ped;
+    },
+    addCrossingPed(av, st) {
+      return spawnCrossingPed(av, st);
+    },
+    setLight(x, z, phase) {
+      // Force one intersection's phase ('ns-green' | 'ns-yellow' | 'ew-green' | 'ew-yellow').
+      G.lightOverrides[x + ',' + z] = phase;
+    },
+    addJetSki(x, z, yaw, colorIdx) {
+      return spawnJetSki(x, z, yaw, colorIdx || 0);
+    },
+    setPlayerJetSki(x, z, yaw, speed) {
+      const ski = spawnJetSki(x, z, yaw, 0);
+      ski.speed = speed || 0;
+      enterJetSki(ski);
+      return ski;
     },
     enemies() { return enemies; },
     setPlayerCar(model, colorIdx, x, z, yaw, speed) {

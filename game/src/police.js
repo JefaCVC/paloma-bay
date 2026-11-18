@@ -66,6 +66,7 @@ export const CRIME_HEAT = {
   carjack: 35,
   hitAndRun: 25,
   shootNearCop: 40,
+  redLight: 15, // running a red light in sight of a cop
   speeding: 0,
 };
 

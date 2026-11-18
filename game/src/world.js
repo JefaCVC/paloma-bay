@@ -155,14 +155,14 @@ function buildBuilding(bd, b) {
   bd.setMat(MAT.PLAIN).setColor(0.25, 0.25, 0.27);
   const ax = x1 - 2 - rng() * 2, az = z0 + 2 + rng() * 2;
   bd.tube([ax, roofY, az], [ax, roofY + 2.6, az], 0.05, 0.03, 5, true);
-  if (b.roof === 'flat' && rng() > 0.6) {
+  if (b.roof === 'flat' && rng() > 0.6 && b.landmark !== 'helipad') {
     // Stepped upper storey, set back from every edge.
     bd.setColor(b.color[0] * 0.85, b.color[1] * 0.85, b.color[2] * 0.85);
     bd.box(x0 + 3, roofY, z0 + 3, x1 - 3, roofY + 2.0, z1 - 3);
     bd.setColor(0.93, 0.90, 0.82);
     bd.box(x0 + 2.85, roofY + 1.7, z0 + 2.85, x1 - 2.85, roofY + 2.0, z1 - 2.85);
   }
-  if (rng() > 0.7) {
+  if (rng() > 0.7 && b.landmark !== 'helipad') {
     // Rooftop water tank on a low base.
     const tx = x0 + 4 + rng() * Math.max(1, (x1 - x0) - 8);
     const tz = z0 + 4 + rng() * Math.max(1, (z1 - z0) - 8);
@@ -175,7 +175,9 @@ function buildBuilding(bd, b) {
   // Tall towers get a proper antenna mast + red beacon, so the skyline
   // reads varied from the beachfront and the title orbit.
   if (h >= 24) {
-    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    // The helipad tower's mast moves to a corner so it never pierces the pad.
+    const mx = b.landmark === 'helipad' ? x0 + 2.5 : (x0 + x1) / 2;
+    const mz = b.landmark === 'helipad' ? z0 + 2.5 : (z0 + z1) / 2;
     bd.setMat(MAT.METAL).setColor(0.45, 0.45, 0.48);
     bd.tube([mx, roofY, mz], [mx, roofY + 6, mz], 0.09, 0.04, 6, true);
     bd.setMat(MAT.EMIT).setColor(1.0, 0.15, 0.15);
@@ -193,6 +195,27 @@ function buildBuilding(bd, b) {
     buildLoungeChair(bd, mx + 5.5, mz - 2, -0.4, [0.95, 0.95, 0.95], roofY + 0.3);
     bd.setMat(MAT.EMIT).setColor(1.0, 0.85, 0.45);
     bd.box(x0 + 3, h - 3.2, z1 + 0.05, x1 - 3, h - 1.6, z1 + 0.4);
+  }
+  // The helipad tower: a roof pad (dark disc + yellow ring + white H) so
+  // the tallest tower reads as a working building, not a flat box.
+  if (b.landmark === 'helipad') {
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    bd.setMat(MAT.PLAIN).setColor(0.16, 0.16, 0.18);
+    bd.disc([mx, roofY + 0.12, mz], [0, 1, 0], 3.4, 20);
+    bd.setMat(MAT.EMIT).setColor(1.0, 0.80, 0.25);
+    for (let i = 0; i < 16; i++) {
+      const a0 = (i / 16) * TAU, a1 = ((i + 1) / 16) * TAU;
+      bd.tube(
+        [mx + Math.cos(a0) * 3.2, roofY + 0.14, mz + Math.sin(a0) * 3.2],
+        [mx + Math.cos(a1) * 3.2, roofY + 0.14, mz + Math.sin(a1) * 3.2],
+        0.07, 0.07, 4, true,
+      );
+    }
+    bd.setColor(1.0, 1.0, 1.0);
+    const hy = roofY + 0.16;
+    bd.quad([mx - 1.2, hy, mz - 1.4], [mx - 0.6, hy, mz - 1.4], [mx - 0.6, hy, mz + 1.4], [mx - 1.2, hy, mz + 1.4]);
+    bd.quad([mx + 0.6, hy, mz - 1.4], [mx + 1.2, hy, mz - 1.4], [mx + 1.2, hy, mz + 1.4], [mx + 0.6, hy, mz + 1.4]);
+    bd.quad([mx - 1.2, hy, mz - 0.3], [mx + 1.2, hy, mz - 0.3], [mx + 1.2, hy, mz + 0.3], [mx - 1.2, hy, mz + 0.3]);
   }
   // Ground floor for EVERY building: an entrance door, two lit windows
   // and a striped awning over the door — the street level reads as shops
@@ -333,6 +356,110 @@ function buildStreetlight(bd, x, z, faceZ) {
   bd.box(x - 0.28, 4.78, z + armZ - 0.25, x + 0.28, 4.95, z + armZ + 0.25);
   bd.setMat(MAT.EMIT).setColor(1.0, 0.75, 0.40);
   bd.disc([x, 4.77, z + armZ], [0, -1, 0], 0.2, 10);
+}
+
+// --- traffic lights ------------------------------------------------------------
+// Signaled intersections: the avenue (x) and street (z) that cross, plus a
+// phase offset so neighbouring lights don't flip in lockstep. Cycle 28s:
+// NS green 12s, NS yellow 2s, EW green 12s, EW yellow 2s. The poles + head
+// boxes are static (merged into the world); the LAMPS are one dynamic mesh
+// rebuilt by game.js whenever any phase flips. Traffic AI stops at red;
+// pedestrians cross at the painted crosswalks only while their road is red.
+export const TRAFFIC_LIGHTS = [
+  { x: 0, z: 0, offset: 0 },
+  { x: 60, z: 0, offset: 7 },
+  { x: -60, z: 0, offset: 14 },
+  { x: 0, z: 50, offset: 21 },
+  { x: 60, z: 50, offset: 3 },
+  { x: -60, z: 50, offset: 10 },
+  { x: 0, z: -50, offset: 17 },
+  { x: -60, z: -50, offset: 24 },
+  { x: 60, z: -50, offset: 5 },
+  { x: 60, z: 100, offset: 12 }, // beachfront: the cover shot's red light
+];
+export const LIGHT_CYCLE = 28;
+
+// Phase at time t (seconds): { ns, ew }, each 'green' | 'yellow' | 'red'.
+// An override map ({ "x,z": phaseName }) forces one intersection's phase —
+// used by the screenshot stager to freeze a red light into the cover.
+export function lightPhase(light, t, overrides) {
+  if (overrides) {
+    const forced = overrides[light.x + ',' + light.z];
+    if (forced === 'ns-green') return { ns: 'green', ew: 'red' };
+    if (forced === 'ns-yellow') return { ns: 'yellow', ew: 'red' };
+    if (forced === 'ew-green') return { ns: 'red', ew: 'green' };
+    if (forced === 'ew-yellow') return { ns: 'red', ew: 'yellow' };
+  }
+  const p = (((t + light.offset) % LIGHT_CYCLE) + LIGHT_CYCLE) % LIGHT_CYCLE;
+  if (p < 12) return { ns: 'green', ew: 'red' };
+  if (p < 14) return { ns: 'yellow', ew: 'red' };
+  if (p < 26) return { ns: 'red', ew: 'green' };
+  return { ns: 'red', ew: 'yellow' };
+}
+
+// The four signal heads of one intersection. Each head stands on a sidewalk
+// corner pole and faces the traffic approaching from the opposite side:
+// southbound (drives +z) reads the south-east head facing north, northbound
+// the north-west head facing south, eastbound the east-north head facing
+// west, westbound the west-south head facing east. dir is which phase it
+// shows ('ns' or 'ew').
+export function lightHeads(light) {
+  const { x, z } = light;
+  return [
+    { x: x + 5.5, z: z + 6.5, nx: 0, nz: -1, dir: 'ns' }, // southbound approach
+    { x: x - 5.5, z: z - 6.5, nx: 0, nz: 1, dir: 'ns' }, // northbound approach
+    { x: x + 6.5, z: z - 5.5, nx: -1, nz: 0, dir: 'ew' }, // eastbound approach
+    { x: x - 6.5, z: z + 5.5, nx: 1, nz: 0, dir: 'ew' }, // westbound approach
+  ];
+}
+
+const HEAD_Y = 4.7; // lamp-row centre height (head box spans 3.85..5.55)
+
+// Static part: pole + head box (the lamps are drawn dynamically).
+function buildTrafficLightPole(bd, head) {
+  bd.setMat(MAT.METAL).setColor(0.16, 0.16, 0.18);
+  bd.tube([head.x, 0.15, head.z], [head.x, HEAD_Y + 0.9, head.z], 0.09, 0.07, 6, true);
+  // Head box: thin along its facing axis, 0.7 wide, 1.7 tall.
+  const thinX = head.nx !== 0; // faces east/west -> thin in x
+  const hx0 = thinX ? head.x - 0.18 : head.x - 0.35;
+  const hx1 = thinX ? head.x + 0.18 : head.x + 0.35;
+  const hz0 = thinX ? head.z - 0.35 : head.z - 0.18;
+  const hz1 = thinX ? head.z + 0.35 : head.z + 0.18;
+  bd.setMat(MAT.PLAIN).setColor(0.08, 0.08, 0.09);
+  bd.box(hx0, HEAD_Y - 0.85, hz0, hx1, HEAD_Y + 0.85, hz1);
+  // Visor hood over the lamps.
+  bd.box(hx0 - 0.02, HEAD_Y + 0.85, hz0 - 0.02, hx1 + 0.02, HEAD_Y + 0.95, hz1 + 0.02);
+}
+
+// Dynamic part: the three lamps of every head (red top, yellow middle,
+// green bottom). Only the active lamp glows; the others are dark glass.
+// Returns a MeshBuilder the caller uploads and re-uploads on phase flips
+// (one draw call for all forty heads).
+export function buildTrafficLightLamps(t, overrides) {
+  const bd = new MeshBuilder();
+  const lampCols = {
+    red: [1.0, 0.12, 0.10], yellow: [1.0, 0.78, 0.15], green: [0.25, 1.0, 0.30],
+  };
+  const darkCols = {
+    red: [0.28, 0.08, 0.08], yellow: [0.28, 0.22, 0.08], green: [0.08, 0.25, 0.10],
+  };
+  for (const light of TRAFFIC_LIGHTS) {
+    const phase = lightPhase(light, t, overrides);
+    for (const head of lightHeads(light)) {
+      const active = phase[head.dir];
+      // Lamp plane proud of the box face (faces are 0.18 off centre).
+      const fx = head.x + head.nx * 0.20;
+      const fz = head.z + head.nz * 0.20;
+      const lamps = [['red', 0.55], ['yellow', 0], ['green', -0.55]];
+      for (const [name, dy] of lamps) {
+        const on = active === name;
+        if (on) bd.setMat(MAT.EMIT).setColor(lampCols[name][0], lampCols[name][1], lampCols[name][2]);
+        else bd.setMat(MAT.PLAIN).setColor(darkCols[name][0], darkCols[name][1], darkCols[name][2]);
+        bd.disc([fx, HEAD_Y + dy, fz], [head.nx, 0, head.nz], 0.24, 12);
+      }
+    }
+  }
+  return bd;
 }
 
 // Market stall (Barrio Sol): posts + striped canopy + crates.
@@ -488,6 +615,56 @@ function buildBillboard(bd, spot) {
   bd.pop();
 }
 
+// --- boats (anchored offshore) -------------------------------------------------
+// Sailboats (hull + mast + triangular sails) and motorboats (hull + cabin +
+// outboard), floating at the waterline (y = -0.4). They sit still —
+// anchored boats barely move at this scale — but they make the bay read as
+// used water, not a flat blue plane. game.js reuses BOAT_SPOTS as circular
+// obstacles for the jet ski.
+export const BOAT_SPOTS = [
+  { x: -80, z: 165, yaw: 0.4, kind: 'sail', seed: 1 },
+  { x: -30, z: 178, yaw: -0.3, kind: 'motor', seed: 2 },
+  { x: 30, z: 168, yaw: 0.9, kind: 'sail', seed: 3 },
+  { x: 90, z: 180, yaw: -0.6, kind: 'motor', seed: 4 },
+  { x: 140, z: 162, yaw: 0.2, kind: 'sail', seed: 5 },
+  { x: -196, z: 34, yaw: 1.2, kind: 'sail', seed: 6 }, // off the Porto Lumen pier
+  { x: -202, z: -12, yaw: -0.8, kind: 'motor', seed: 7 },
+];
+
+function buildBoat(bd, x, z, yaw, kind, seed) {
+  bd.push(frame(x, -0.35, z, yaw, 0, 0, 1));
+  const hullCol = kind === 'sail'
+    ? [[0.90, 0.90, 0.92], [0.85, 0.80, 0.70]][seed % 2]
+    : [[0.85, 0.30, 0.25], [0.20, 0.45, 0.75]][seed % 2];
+  bd.setMat(MAT.PAINT).setColor(hullCol[0], hullCol[1], hullCol[2]);
+  // Hull: side profile extruded across the beam (bow at +X).
+  bd.extrude(
+    [[2.6, 0.15], [2.2, 0.75], [0.5, 0.9], [-2.0, 0.9], [-2.6, 0.55], [-2.2, 0.1], [1.6, 0.05]],
+    -0.85, 0.85,
+  );
+  bd.setMat(MAT.PLAIN).setColor(0.55, 0.42, 0.28);
+  bd.quad([-1.9, 0.92, -0.7], [1.9, 0.92, -0.7], [1.9, 0.92, 0.7], [-1.9, 0.92, 0.7]); // deck
+  if (kind === 'sail') {
+    bd.setMat(MAT.METAL).setColor(0.70, 0.70, 0.72);
+    bd.tube([0.3, 0.9, 0], [0.3, 6.2, 0], 0.06, 0.04, 6, true); // mast
+    bd.tube([0.3, 1.6, 0], [-1.9, 1.6, 0], 0.05, 0.04, 5, true); // boom
+    // Sails, double-sided (both faces drawn so they read from either side).
+    bd.setMat(MAT.PLAIN).setColor(0.96, 0.94, 0.88);
+    bd.tri3([0.35, 1.7, 0.02], [0.35, 5.9, 0.02], [-1.8, 1.7, 0.02]); // mainsail
+    bd.tri3([0.35, 1.7, -0.02], [-1.8, 1.7, -0.02], [0.35, 5.9, -0.02]);
+    bd.tri3([0.35, 5.9, 0.02], [0.35, 1.7, 0.02], [2.2, 1.0, 0.02]); // jib
+    bd.tri3([0.35, 5.9, -0.02], [2.2, 1.0, -0.02], [0.35, 1.7, -0.02]);
+  } else {
+    bd.setMat(MAT.PLAIN).setColor(0.92, 0.92, 0.94);
+    bd.box(-0.9, 0.9, -0.6, 0.9, 1.7, 0.6); // cabin
+    bd.setMat(MAT.GLASS).setColor(0.55, 0.70, 0.78);
+    bd.box(0.5, 1.1, -0.62, 0.9, 1.55, 0.62); // windshield
+    bd.setMat(MAT.PLAIN).setColor(0.12, 0.12, 0.14);
+    bd.box(-2.6, 0.35, -0.3, -2.3, 0.9, 0.3); // outboard motor
+  }
+  bd.pop();
+}
+
 // --- beach props (sand-side dressing) ------------------------------------------
 // Each prop owns its own footprint: nothing overlaps a palm trunk, a
 // billboard post, the Ferris wheel, or another prop (placements are
@@ -626,6 +803,17 @@ function buildTrashCan(bd, x, z) {
   bd.tube([x, 0.05, z], [x, 0.85, z], 0.30, 0.26, 10, true);
   bd.setMat(MAT.PLAIN).setColor(0.20, 0.20, 0.22);
   bd.disc([x, 0.86, z], [0, 1, 0], 0.28, 10);
+}
+
+// Fire hydrant: red body + domed cap + side nozzles, on the sidewalk edge.
+function buildHydrant(bd, x, z) {
+  bd.setMat(MAT.PAINT).setColor(0.85, 0.15, 0.12);
+  bd.tube([x, 0.15, z], [x, 0.75, z], 0.16, 0.14, 10, true);
+  bd.blob(x, 0.82, z, 0.15, 0.12, 0.15, x * 3 + z);
+  bd.setMat(MAT.METAL).setColor(0.75, 0.75, 0.78);
+  bd.tube([x - 0.2, 0.55, z], [x + 0.2, 0.55, z], 0.06, 0.06, 6, true);
+  bd.disc([x + 0.21, 0.55, z], [1, 0, 0], 0.08, 8);
+  bd.disc([x - 0.21, 0.55, z], [-1, 0, 0], 0.08, 8);
 }
 
 // String lights between two palm trunks: a sagging line + glowing bulbs.
@@ -899,7 +1087,7 @@ export function buildWorld() {
         let towerCol = null;
         if (bi === 4 && bj === 4 && k === 0) { h = 30; landmark = 'hotel'; towerCol = [0.45, 0.75, 0.78]; }
         else if (bi === 2 && bj === 4 && k === 0) { h = 26; towerCol = [0.90, 0.60, 0.65]; }
-        else if (bi === 5 && bj === 3 && k === 0) { h = 28; towerCol = [0.55, 0.65, 0.85]; }
+        else if (bi === 5 && bj === 3 && k === 0) { h = 28; towerCol = [0.55, 0.65, 0.85]; landmark = 'helipad'; }
         else if (bi === 1 && bj === 3 && k === 1) { h = 24; towerCol = [0.85, 0.75, 0.45]; }
         const floors = Math.max(2, Math.round(h / 2.6));
         const cols = Math.max(3, Math.round((fx1 - fx0) / 2.4));
@@ -908,7 +1096,9 @@ export function buildWorld() {
         const b = {
           x0: fx0, x1: fx1, z0: bz0 + 2, z1: bz1 - 2, h, floors, cols,
           style: d.style, seed: seedCounter++, color: col,
-          roof: d.style === 0 && rng() > 0.5 ? 'hip' : 'flat',
+          // The helipad tower always gets a flat roof (the rng() is still
+          // drawn so the deterministic stream stays identical).
+          roof: d.style === 0 && rng() > 0.5 && landmark !== 'helipad' ? 'hip' : 'flat',
           landmark, cafe: bj === 4 && k === 0,
         };
         buildBuilding(bd, b);
@@ -1056,6 +1246,11 @@ export function buildWorld() {
   for (const x of AVENUES) {
     for (let z = -90; z <= 90; z += 45) palmSpots.push([x + 6.5, z, 20 + z]);
   }
+  // West-side avenue row, offset half a step — the avenues read as
+  // palm-lined boulevards from the chase camera, not single-file lines.
+  for (const x of AVENUES) {
+    for (let z = -68; z <= 90; z += 45) palmSpots.push([x - 6.5, z, 60 + z]);
+  }
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * TAU;
     palmSpots.push([ISLAND.cx + Math.cos(a) * (ISLAND.rx - 6), ISLAND.cz + Math.sin(a) * (ISLAND.rz - 6), 40 + i]);
@@ -1083,6 +1278,32 @@ export function buildWorld() {
     for (let x = -115; x <= 115; x += 30) buildStreetlight(bd, x, z + 5.5, false);
   }
 
+  // Traffic-light poles at every signaled intersection (the lamps are
+  // dynamic — see buildTrafficLightLamps — but the poles + head boxes
+  // are static, merged here). Each pole gets a small collider so cars
+  // and pedestrians can't pass through it.
+  for (const light of TRAFFIC_LIGHTS) {
+    for (const head of lightHeads(light)) {
+      buildTrafficLightPole(bd, head);
+      colliders.push({ x0: head.x - 0.3, z0: head.z - 0.3, x1: head.x + 0.3, z1: head.z + 0.3 });
+    }
+    chunks.flushIfNearLimit();
+  }
+
+  // Fire hydrants along the avenues (red, on the sidewalk edge).
+  for (const x of AVENUES) {
+    buildHydrant(bd, x + 5.5, -75);
+    buildHydrant(bd, x + 5.5, 25);
+  }
+
+  // Benches + planters at the park corners and the garage forecourt.
+  buildBench(bd, 28, 56, Math.PI / 2);
+  buildBench(bd, 56, 56, Math.PI / 2);
+  buildPlanter(bd, 30, 92);
+  buildPlanter(bd, 50, 92);
+  buildBench(bd, -24, 44, 0);
+  buildPlanter(bd, -36, 44);
+
   // Market stalls in Barrio Sol.
   for (let i = 0; i < 6; i++) {
     buildMarketStall(bd, -45 + (i % 3) * 12, 60 + Math.floor(i / 3) * 12, (i % 2) * Math.PI, 100 + i);
@@ -1098,6 +1319,12 @@ export function buildWorld() {
   // BILLBOARD_SPOTS) — the strand's skyline, facing eastbound traffic.
   for (const spot of BILLBOARD_SPOTS) {
     buildBillboard(bd, spot);
+    chunks.flushIfNearLimit();
+  }
+
+  // Boats anchored offshore (see BOAT_SPOTS) — the bay reads as used water.
+  for (const b of BOAT_SPOTS) {
+    buildBoat(bd, b.x, b.z, b.yaw, b.kind, b.seed);
     chunks.flushIfNearLimit();
   }
 

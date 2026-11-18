@@ -54,6 +54,16 @@ export function randomLook(seed, kind) {
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
   if (kind === 'cop') return { ...COP_LOOK, skin: pick(SKINS), hair: pick(HAIRS) };
   if (kind === 'thug') return { ...THUG_LOOK, skin: pick(SKINS) };
+  if (kind === 'beach') {
+    // Beachgoers: bright swim colours, no jacket, often a sunhat.
+    return {
+      skin: pick(SKINS), hair: pick(HAIRS),
+      shirt: pick([[0.95, 0.30, 0.25], [0.20, 0.55, 0.85], [1.0, 0.80, 0.25], [0.30, 0.75, 0.45], [0.85, 0.45, 0.85], [0.95, 0.55, 0.15]]),
+      pants: pick([[0.20, 0.50, 0.70], [0.85, 0.30, 0.25], [0.90, 0.85, 0.70], [0.30, 0.65, 0.35]]),
+      shoes: pick(SHOES),
+      hat: rng() > 0.5 ? 'sunhat' : null, jacket: false,
+    };
+  }
   return {
     skin: pick(SKINS), hair: pick(HAIRS), shirt: pick(SHIRTS),
     pants: pick(PANTS), shoes: pick(SHOES),
@@ -63,19 +73,24 @@ export function randomLook(seed, kind) {
 
 // --- character builder ----------------------------------------------------------
 // pose: { phase, walking (0..1), breathe (0..1), breathT (radians),
-//         aiming (0..1), weapon (id | null), swing (0..1, melee swing) }
+//         aiming (0..1), weapon (id | null), swing (0..1, melee swing),
+//         sitting (0..1, jet-ski seat: hips at seat height, legs forward) }
 // The character faces +X in model space; game.js yaws the transform.
 export function buildCharacter(look, pose) {
   const bd = new MeshBuilder();
   const ph = pose.phase || 0;
   const walking = pose.walking || 0;
   const aiming = pose.aiming || 0;
+  const sitting = pose.sitting ? 1 : 0;
   // Hips dip when the legs are apart (double support) — this is what keeps
   // the feet on the ground through the stride.
   const dip = Math.abs(Math.sin(ph)) * 0.09 * walking;
   const breathe = (pose.breathe || 0) * Math.sin(pose.breathT || 0);
-  const hipY = CHAR.hipY - dip + breathe * 0.008;
-  const lean = 0.06 * walking + 0.10 * aiming;
+  // Sitting (jet ski): hips at the seat height (0.62, just above the
+  // 0.58 seat top), no gait dip; the rider leans slightly forward
+  // toward the handlebars.
+  const hipY = sitting ? 0.62 + breathe * 0.006 : CHAR.hipY - dip + breathe * 0.008;
+  const lean = sitting ? 0.12 : 0.06 * walking + 0.10 * aiming;
   const hip = [0, hipY, 0];
   const shoulder = [Math.sin(lean) * 0.55, hipY + 0.55, 0];
   const chestR = 0.165 * (1 + breathe * 0.03);
@@ -105,13 +120,20 @@ export function buildCharacter(look, pose) {
   } else if (look.hat === 'bandana') {
     bd.setColor(0.65, 0.12, 0.12);
     bd.blob(headC[0], headC[1] + 0.08, headC[2], CHAR.headR * 1.04, CHAR.headR * 0.55, CHAR.headR * 1.04, 8.3);
+  } else if (look.hat === 'sunhat') {
+    // Wide-brimmed straw sunhat (beachgoers).
+    bd.setColor(0.92, 0.85, 0.60);
+    bd.blob(headC[0], headC[1] + 0.08, headC[2], CHAR.headR * 0.95, CHAR.headR * 0.5, CHAR.headR * 0.95, 8.5);
+    bd.disc([headC[0], headC[1] + 0.06, headC[2]], [0, 1, 0], CHAR.headR * 1.9, 12);
   }
 
   // Legs: FK from hip angles + knee bend.
   const leg = (side, phaseOff) => {
     const p = ph + phaseOff;
-    const hipA = Math.sin(p) * 0.55 * walking;
-    const bend = (0.12 + 0.7 * Math.max(0, -Math.cos(p + 0.4))) * walking;
+    let hipA = Math.sin(p) * 0.55 * walking;
+    let bend = (0.12 + 0.7 * Math.max(0, -Math.cos(p + 0.4))) * walking;
+    // Sitting: thighs forward, shins forward-down — feet land on the deck.
+    if (sitting) { hipA = 1.2; bend = 0.1; }
     const hipJ = [hip[0], hip[1] - 0.02, side * 0.09];
     const thighDir = [Math.sin(hipA), -Math.cos(hipA), 0];
     const knee = [hipJ[0] + thighDir[0] * CHAR.thigh, hipJ[1] + thighDir[1] * CHAR.thigh, hipJ[2]];
@@ -136,7 +158,11 @@ export function buildCharacter(look, pose) {
     const p = ph + phaseOff;
     const shJ = [shoulder[0], shoulder[1] - 0.02, side * CHAR.shoulderW];
     let upDir, foreDir;
-    if (isRight && aiming > 0.01) {
+    if (sitting) {
+      // Both hands forward-down to the handlebars.
+      upDir = [0.85, -0.7, side * 0.05];
+      foreDir = [0.8, -0.55, side * 0.05];
+    } else if (isRight && aiming > 0.01) {
       // Aim: upper arm forward, forearm forward, slight downward tilt.
       const swing = (pose.swing || 0) * 1.2; // melee wind-up raises the arm
       upDir = [Math.cos(0.15 + swing), -Math.sin(0.15 + swing) * 0.4 + swing * 0.5, 0];

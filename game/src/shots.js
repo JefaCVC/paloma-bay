@@ -36,6 +36,13 @@ export function stageShot(G, api, name) {
     api.setPlayerCar('coupe', 0, 20, 100, 0, 22);
     api.addCar('sedan', 1, 52, 100, 0, 'traffic');
     api.addCar('van', 0, 66, 96, 0, 'traffic');
+    // Working traffic lights: the beachfront light ahead is RED for the
+    // eastbound chase — the sedan waits at the stop line (x = 52.5) and a
+    // pedestrian waits at the painted crosswalk. A jet ski rides the bay
+    // to the right of the chase.
+    api.setLight(60, 100, 'ns-green');
+    api.addCrossingPed(60, 100);
+    api.addJetSki(70, 145, -Math.PI / 2, 3);
     api.addPed(28, 105.5);
     api.addPed(39, 94.5);
     api.addPed(16, 105.5);
@@ -81,6 +88,10 @@ export function stageShot(G, api, name) {
     api.profile().missionsDone = [1, 2, 3, 4];
     api.setPlayerOnFoot(-60, -50, Math.PI / 2, 'rifle', true);
     api.player().armor = 50;
+    // The intersection light glows red for the avenue at night, and a
+    // pedestrian crosses on the painted crosswalk behind the firefight.
+    api.setLight(-60, -50, 'ew-green');
+    api.addCrossingPed(-60, -50);
     // 3/4 camera angle: Theo's profile + rifle silhouette read against the
     // lit street instead of a dead-behind shot.
     G.camera.yaw = Math.PI / 2 + 0.55;
@@ -155,5 +166,15 @@ export function stageShot(G, api, name) {
     for (const [fx, fz] of friends) api.addPed(fx, fz, -Math.PI / 2);
     api.completeAllForEnding('clean');
     api.showEnding('clean');
+  } else if (name === 'jetski') {
+    // Live-staging state for the jet ski (use with ?live=1): Theo rides
+    // a Sea Dart across the bay at dusk, wake trailing, PBPD-free. The
+    // moored skis come from initWorld; this one is his ride.
+    api.setTime(18.4, 0);
+    api.setCash(5000);
+    api.setRep(1);
+    api.setLoyaltyFavor(50, 50);
+    api.setPlayerJetSki(24, 150, 0, 12); // east along the bay (clear water)
+    G.mode = 'play';
   }
 }

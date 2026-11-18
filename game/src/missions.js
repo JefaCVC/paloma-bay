@@ -58,11 +58,12 @@ export const MISSIONS = [
   },
   {
     id: 4, name: 'Low Tide', giver: 'Isadora Vireo', district: 'Porto Lumen',
-    brief: 'Move product through the docks while the PBPD patrols the piers.',
+    brief: 'The PBPD owns the roads tonight — move the cargo by water instead.',
     payout: 2000, rep: 2,
     stages: [
-      { type: 'driveTo', x: POI.pier.x + 8, z: POI.pier.z, text: 'Pick up the cargo at the pier', next: 'Carry it through the docks' },
-      { type: 'driveTo', x: -60, z: -50, text: 'Cross the docks — stay cool', next: 'Deliver to Zed' },
+      { type: 'driveTo', x: POI.pier.x + 8, z: POI.pier.z, text: 'Pick up the cargo at the pier', next: 'The roads are watched — take the water' },
+      { type: 'driveTo', x: 24, z: 140, text: 'Drive to the beach — a jet ski waits at the waterline', next: 'Ride the jet ski across the bay' },
+      { type: 'driveTo', x: 60, z: 168, text: 'Ride the jet ski to the rendezvous — the PBPD cannot follow on water', next: 'Deliver to Zed' },
       { type: 'driveTo', x: POI.pawn.x, z: POI.pawn.z + 8, text: "Deliver the cargo to Zed's Pawn", next: 'Mission complete' },
     ],
   },

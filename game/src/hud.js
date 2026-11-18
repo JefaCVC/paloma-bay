@@ -97,8 +97,8 @@ export function initHUD() {
     'response-panel', 'response-rows',
     'mission-panel', 'mission-name', 'mission-stage', 'mission-objective',
     'mission-dist', 'mission-next', 'chatter',
-    'weapon-name', 'weapon-slots', 'speed-wrap', 'car-name', 'car-cond-bar', 'hint',
-    'speedo-needle', 'speedo-num',
+    'weapon-name', 'weapon-slots', 'speed-wrap', 'car-name', 'car-cond', 'hint',
+    'speedo-needle', 'speedo-num', 'speedo-arc',
     'vitals-hp-bar', 'vitals-hp-val', 'vitals-armor-bar', 'vitals-armor-val',
     'crosshair', 'interact', 'dialog', 'dialog-speaker', 'dialog-text', 'dialog-portrait',
     'choices', 'banner', 'banner-title', 'banner-sub', 'toast', 'vignette',
@@ -147,7 +147,10 @@ export function updateHUD(view) {
   // radio (bottom-right).
   setText(el.clock, clockLabel(view.hour) + ' · DAY ' + view.day + (view.rain > 0.3 ? ' · RAIN' : ''));
   setText(el.district, view.district);
-  setText(el.radio, view.station + ' — ' + view.track);
+  // Radio: track title only — the artist would push the line past the
+  // 264px corner and clip mid-word.
+  const trackTitle = (view.track || '').split(' — ')[0];
+  setText(el.radio, view.station + ' — ' + trackTitle);
   // PBPD response panel: per-unit name + live distance + state.
   if (el['response-panel']) {
     const units = view.police.units || [];
@@ -205,8 +208,8 @@ export function updateHUD(view) {
     }).join('');
     if (el['weapon-slots'].innerHTML !== slots) el['weapon-slots'].innerHTML = slots;
   }
-  // Bottom-right: radio + ROUND speedometer (dial + needle + digital
-  // km/h in the middle) with the car name + condition bar.
+  // Bottom-right: radio + FLOATING round speedometer (thin ring + amber
+  // arc + needle + digital km/h) with the car name + one condition line.
   if (el['speed-wrap']) {
     el['speed-wrap'].style.display = view.inCar ? 'block' : 'none';
     setText(el['car-name'], view.carName || '');
@@ -217,10 +220,20 @@ export function updateHUD(view) {
       const ang = -120 + (Math.min(200, Math.max(0, kmh)) / 200) * 240;
       el['speedo-needle'].setAttribute('transform', 'rotate(' + ang.toFixed(1) + ' 70 70)');
     }
-    if (el['car-cond-bar']) {
-      const hp = view.carHp === undefined || view.carHp === null ? 100 : view.carHp;
-      el['car-cond-bar'].style.width = Math.max(0, Math.min(100, hp)) + '%';
-      el['car-cond-bar'].style.background = hp > 50 ? 'var(--green)' : hp > 25 ? 'var(--amber)' : 'var(--red)';
+    if (el['speedo-arc']) {
+      // Amber arc: 240° of the r=60 circle = 251.3 units of dash.
+      const frac = Math.min(200, Math.max(0, kmh)) / 200;
+      el['speedo-arc'].setAttribute('stroke-dasharray', (frac * 251.3).toFixed(1) + ' 377');
+    }
+    if (el['car-cond']) {
+      // Condition is text now, not a bar; jet skis have no condition.
+      if (view.carHp === undefined || view.carHp === null) {
+        setText(el['car-cond'], '');
+      } else {
+        const hp = Math.max(0, Math.min(100, view.carHp));
+        setText(el['car-cond'], 'CONDITION ' + Math.round(hp) + '%');
+        el['car-cond'].style.color = hp > 50 ? 'var(--green)' : hp > 25 ? 'var(--amber)' : 'var(--red)';
+      }
     }
   }
   // Top-right, under the weapon bar: HP + ARMOR bars (always visible —
@@ -358,6 +371,12 @@ function drawMinimap(ctx, view) {
   drawBlip(ctx, X, Z, POI.gunshop.x, POI.gunshop.z, '#ff6b4a', 3, 'circle');
   drawBlip(ctx, X, Z, POI.safehouse.x, POI.safehouse.z, '#7ddb52', 3, 'circle');
   drawBlip(ctx, X, Z, POI.pawn.x, POI.pawn.z, '#c07df0', 3, 'circle');
+  // Traffic lights: a dot per intersection, coloured by the avenue (NS)
+  // phase — red means the avenue is stopped.
+  for (const l of view.lights || []) {
+    const c = l.ns === 'green' ? '#7ddb52' : l.ns === 'yellow' ? '#f5c542' : '#ff2a2a';
+    drawBlip(ctx, X, Z, l.x, l.z, c, 2, 'circle');
+  }
   // Mission marker.
   if (view.mission && view.mission.active && view.mission.mx !== undefined) {
     drawBlip(ctx, X, Z, view.mission.mx, view.mission.mz, '#ffd23e', 5, 'diamond');
@@ -509,6 +528,11 @@ export function drawFullMap(view) {
   }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
+  // Traffic lights: a dot per intersection, coloured by the avenue (NS) phase.
+  for (const l of view.lights || []) {
+    const c = l.ns === 'green' ? '#7ddb52' : l.ns === 'yellow' ? '#f5c542' : '#ff2a2a';
+    drawBlip(ctx, X, Z, l.x, l.z, c, 3, 'circle');
+  }
   if (view.mission && view.mission.active && view.mission.mx !== undefined) {
     drawBlip(ctx, X, Z, view.mission.mx, view.mission.mz, '#ffd23e', 8, 'diamond');
   }

@@ -31,8 +31,8 @@ const PRESETS = {
     windowLit: 0.08, name: 'Day',
   },
   dusk: {
-    sunDir: [-0.55, 0.20, 0.42], sunColor: [1.0, 0.50, 0.32], sunIntensity: 1.9, // lower sun, warmer
-    zenith: [0.26, 0.34, 0.62], horizon: [1.0, 0.52, 0.42], // warmer, pinker
+    sunDir: [-0.55, 0.20, 0.42], sunColor: [1.0, 0.47, 0.30], sunIntensity: 2.1, // lower sun, warmer, stronger gold
+    zenith: [0.26, 0.34, 0.62], horizon: [1.0, 0.50, 0.38], // warmer, pinker
     fogColor: [0.99, 0.58, 0.45], fogNear: 45, fogFar: 170,
     ambSky: [0.52, 0.58, 0.74], ambGround: [0.50, 0.36, 0.32], ambStrength: 0.85,
     windowLit: 0.55, name: 'Dusk',
