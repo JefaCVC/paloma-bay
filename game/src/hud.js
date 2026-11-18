@@ -235,12 +235,20 @@ export function updateHUD(view) {
     if (el['score-popups'].innerHTML !== html) el['score-popups'].innerHTML = html;
   }
   // Damage numbers: projected screen positions, rising + fading.
+  // Offset +55px right of the anchor: the enemy's red marker triangle
+  // hangs directly above its head at the same screen x, and a number
+  // centred on the anchor hides behind it (the −48 HEAVY HIT was ~50%
+  // covered). The shift clears the triangle (half-width ~17px) plus the
+  // widest number div, and is clamped so numbers near the right edge
+  // never clip off-screen.
   if (el['damage-numbers']) {
     const nums = (view.damageNumbers || []).filter((n) => n.age < 1);
+    const vw = window.innerWidth || 1280;
     const html = nums.map((n) => {
       const op = (1 - n.age).toFixed(2);
       const top = (n.sy - n.age * 24).toFixed(0);
-      return '<div class="dmg-num' + (n.sub ? ' heavy' : '') + '" style="left:' + n.sx.toFixed(0) + 'px;top:' + top + 'px;opacity:' + op + '">'
+      const left = Math.min(n.sx + 55, vw - 40).toFixed(0);
+      return '<div class="dmg-num' + (n.sub ? ' heavy' : '') + '" style="left:' + left + 'px;top:' + top + 'px;opacity:' + op + '">'
         + escapeHtml(n.text) + (n.sub ? '<span class="dmg-sub">' + escapeHtml(n.sub) + '</span>' : '') + '</div>';
     }).join('');
     if (el['damage-numbers'].innerHTML !== html) el['damage-numbers'].innerHTML = html;
