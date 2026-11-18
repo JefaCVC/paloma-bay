@@ -271,4 +271,16 @@ export class MeshBuilder {
   }
 
   get vertexCount() { return this.pos.length / 3; }
+
+  // Reset the vertex/index arrays so the builder can start a new chunk.
+  // Keeps the current colour/material/seed/sway state (the next object
+  // sets its own) and the transform stack — flushes only happen between
+  // objects, when the stack is back at base. The builder object itself
+  // stays valid, so a captured reference keeps writing into the new chunk.
+  clear() {
+    this.pos = []; this.nor = []; this.col = [];
+    this.uv = []; this.mat = []; this.seed = []; this.sway = [];
+    this.idx = [];
+    return this;
+  }
 }

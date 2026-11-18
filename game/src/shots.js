@@ -20,9 +20,11 @@ function setUnitDistances(G) {
 
 export function stageShot(G, api, name) {
   if (name === 'cover') {
-    // Dusk chase on La Rambla: hero coupe, 3 PBPD units + AIR-1, wanted 3,
-    // mission 5 ("Siren Song") in its chase stage, rich HUD numbers.
-    // Police sit ahead/beside the player so they are IN the chase-cam frame.
+    // Dusk chase on the BEACHFRONT (La Rambla, z=100): hero coupe, 3 PBPD
+    // units + AIR-1, wanted 3, mission 5 ("Siren Song") in its chase stage,
+    // rich HUD numbers — with the palm-lined strand, the lit billboards and
+    // the Paloma Wheel behind the chase. Police sit ahead/beside the player
+    // so they are IN the chase-cam frame; peds stand clear of the palm rows.
     api.setTime(18.4, 0);
     api.setCash(12480);
     api.setRep(2);
@@ -31,23 +33,23 @@ export function stageShot(G, api, name) {
     ms.done = [1, 2, 3, 4];
     ms.nextId = 5;
     api.profile().missionsDone = [1, 2, 3, 4];
-    api.setPlayerCar('coupe', 0, 20, 50, 0, 22);
-    api.addCar('sedan', 1, 52, 50, 0, 'traffic');
-    api.addCar('van', 0, 66, 46, 0, 'traffic');
-    api.addPed(28, 44.5);
-    api.addPed(36, 55.5);
-    api.addPed(13, 45.5);
+    api.setPlayerCar('coupe', 0, 20, 100, 0, 22);
+    api.addCar('sedan', 1, 52, 100, 0, 'traffic');
+    api.addCar('van', 0, 66, 96, 0, 'traffic');
+    api.addPed(28, 105.5);
+    api.addPed(39, 94.5);
+    api.addPed(16, 105.5);
     api.startMissionAt(5, 1);
     // Override the mission's wanted-2 with a full 3-star pursuit.
     G.police.wanted = 3;
     G.police.heat = 40;
     G.police.trace = 82;
     G.police.units = [];
-    api.addPoliceCar(35, 46.5, 0, 24);
-    api.addPoliceCar(38, 54, 0, 22);
-    api.addPoliceCar(29, 54.5, 0, 20);
-    api.setHeli(48, 42, 17);
-    G.playerX = 20; G.playerZ = 50;
+    api.addPoliceCar(35, 96.5, 0, 24);
+    api.addPoliceCar(38, 104, 0, 22);
+    api.addPoliceCar(29, 104.5, 0, 20);
+    api.setHeli(58, 104, 17);
+    G.playerX = 20; G.playerZ = 100;
     setUnitDistances(G);
     G.police.chatter = [
       { text: 'PBPD-1: I have visual — Falco GT, 12m out.', t: 0 },

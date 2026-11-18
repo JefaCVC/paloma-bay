@@ -1,10 +1,10 @@
 // hud.js — every pixel of UI in PALOMA BAY.
 // One kit: dark gradient panels, 2px borders, amber accent (#f5c542),
 // outlined text, 4-unit spacing scale. Four-corner HUD like the top 5:
-//   top-left     wanted stars + cash + rep + loyalty/favor + TRACE
-//   top-right    minimap + clock + district + radio
-//   bottom-left  mission objective + dispatch chatter
-//   bottom-right weapon + speed + contextual controls hint
+//   top-left     mission objective + PBPD response + dispatch chatter
+//   top-right    wanted stars + cash + rep + clock, weapon bar below
+//   bottom-left  ROUND minimap + district + loyalty/favor + TRACE
+//   bottom-right radio + car name + condition bar + big speed + hint
 // Text never leaves its box: DOM panels wrap and clip by CSS; canvas text
 // is measured (measureText) before it is drawn. All UI text is English.
 
@@ -20,6 +20,17 @@ let mapCtx = null;
 let bannerTimer = null;
 let toastTimer = null;
 
+// Weapon silhouettes for the HUD slots: original inline-SVG paths drawn
+// for this game (48×24 viewBox, fill=currentColor so the slot's state
+// colours the icon — amber when current, dimmed when locked).
+const WEAPON_ICONS = {
+  pistol: '<path d="M6 4h34v6H22l-3 11h-7l2-11H6z"/>',
+  smg: '<path d="M4 5h30v6H26l-2 8h-6l2-8H16l-2 9H8l2-9H4z"/><rect x="34" y="7" width="10" height="2.5"/>',
+  shotgun: '<rect x="4" y="6" width="38" height="4.5"/><rect x="12" y="10.5" width="9" height="4" rx="1"/><path d="M4 10.5h7l-3 9.5H4z"/>',
+  rifle: '<rect x="4" y="6" width="36" height="4"/><rect x="40" y="7" width="6" height="2"/><path d="M16 10h8l-2 8h-5z"/><path d="M4 10h5l-1 5H4z"/><rect x="26" y="3" width="6" height="3"/>',
+  bat: '<rect x="20" y="2" width="5" height="20" rx="2.5" transform="rotate(35 22 12)"/>',
+};
+
 export function initHUD() {
   const ids = [
     'hud', 'wanted-stars', 'cash', 'rep-title', 'loyalty-bar', 'loyalty-val',
@@ -28,7 +39,7 @@ export function initHUD() {
     'response-panel', 'response-rows',
     'mission-panel', 'mission-name', 'mission-stage', 'mission-objective',
     'mission-dist', 'mission-next', 'chatter',
-    'weapon-name', 'weapon-ammo', 'weapon-slots', 'speed', 'speed-wrap', 'hint',
+    'weapon-name', 'weapon-slots', 'speed', 'speed-wrap', 'car-name', 'car-cond-bar', 'hint',
     'crosshair', 'interact', 'dialog', 'dialog-speaker', 'dialog-text',
     'choices', 'banner', 'banner-title', 'banner-sub', 'toast', 'vignette',
     'health-bar', 'health-wrap',
@@ -51,7 +62,8 @@ function setText(node, text) {
 // --- HUD update (per frame) -------------------------------------------------------
 export function updateHUD(view) {
   const p = view.profile;
-  // Top-left: wanted + money + rep + loyalty/favor + TRACE.
+  // Top-right status: wanted + money + rep. (Loyalty/favor/TRACE live
+  // under the minimap, bottom-left.)
   if (el['wanted-stars']) {
     let stars = '';
     for (let i = 0; i < 5; i++) stars += i < view.police.wanted ? '★' : '☆';
@@ -65,11 +77,12 @@ export function updateHUD(view) {
   if (el['favor-bar']) el['favor-bar'].style.width = p.favor + '%';
   setText(el['favor-val'], 'FAVOR ' + Math.round(p.favor));
   if (el['trace-wrap']) {
-    el['trace-wrap'].style.display = view.police.wanted > 0 ? 'block' : 'none';
+    el['trace-wrap'].style.display = view.police.wanted > 0 ? 'flex' : 'none';
     if (el['trace-bar']) el['trace-bar'].style.width = Math.round(view.police.trace) + '%';
     setText(el['trace-val'], 'TRACE ' + Math.round(view.police.trace) + '%' + (view.seen ? ' · IN SIGHT' : ' · HIDDEN'));
   }
-  // Top-right: clock + district + radio.
+  // Clock (top-right status), district (under the minimap, bottom-left),
+  // radio (bottom-right).
   setText(el.clock, clockLabel(view.hour) + ' · DAY ' + view.day + (view.rain > 0.3 ? ' · RAIN' : ''));
   setText(el.district, view.district);
   setText(el.radio, view.station + ' — ' + view.track);
@@ -93,7 +106,7 @@ export function updateHUD(view) {
       if (el['response-rows'].innerHTML !== html) el['response-rows'].innerHTML = html;
     }
   }
-  // Bottom-left: mission objective.
+  // Top-left: mission objective.
   if (el['mission-panel']) {
     const m = view.mission;
     if (m && m.active) {
@@ -112,22 +125,34 @@ export function updateHUD(view) {
     const html = view.police.chatter.map((c) => '<div>' + escapeHtml(c.text) + '</div>').join('');
     if (el.chatter.innerHTML !== html) el.chatter.innerHTML = html;
   }
-  // Bottom-right: weapon + speed + hint.
+  // Top-right: weapon bar — picture-icon slots with ammo under each
+  // icon (current raised + amber, locked dimmed + LOCKED label).
   const w = WEAPONS[view.weapon];
   setText(el['weapon-name'], w ? w.name : '');
-  if (w && w.melee) setText(el['weapon-ammo'], '—');
-  else if (w) setText(el['weapon-ammo'], view.mag + ' / ' + view.reserve);
   if (el['weapon-slots']) {
     const slots = WEAPON_ORDER.map((id) => {
-      const owned = view.loadout.owned[id].owned;
+      const w2 = WEAPONS[id];
+      const slot = view.loadout.owned[id];
+      const owned = slot && slot.owned;
       const cur = id === view.weapon;
-      return '<span class="slot' + (cur ? ' cur' : '') + (owned ? '' : ' locked') + '">' + WEAPONS[id].slot + '</span>';
+      const ammo = !owned ? 'LOCKED' : w2.melee ? '—' : (slot.mag + '/' + slot.reserve);
+      return '<span class="slot' + (cur ? ' cur' : '') + (owned ? '' : ' locked') + '">'
+        + '<span class="slot-key">' + w2.slot + '</span>'
+        + '<svg viewBox="0 0 48 24" fill="currentColor" aria-hidden="true">' + WEAPON_ICONS[id] + '</svg>'
+        + '<span class="slot-ammo">' + ammo + '</span></span>';
     }).join('');
     if (el['weapon-slots'].innerHTML !== slots) el['weapon-slots'].innerHTML = slots;
   }
+  // Bottom-right: radio + big speed (car name + condition bar + huge speed).
   if (el['speed-wrap']) {
     el['speed-wrap'].style.display = view.inCar ? 'block' : 'none';
-    setText(el.speed, Math.round(view.speed * 3.6) + ' km/h');
+    setText(el['car-name'], view.carName || '');
+    setText(el.speed, String(Math.round(view.speed * 3.6)));
+    if (el['car-cond-bar']) {
+      const hp = view.carHp === undefined || view.carHp === null ? 100 : view.carHp;
+      el['car-cond-bar'].style.width = Math.max(0, Math.min(100, hp)) + '%';
+      el['car-cond-bar'].style.background = hp > 50 ? 'var(--green)' : hp > 25 ? 'var(--amber)' : 'var(--red)';
+    }
   }
   setText(el.hint, view.hint || '');
   // Health bar.
@@ -221,6 +246,12 @@ function drawBlip(ctx, X, Z, x, z, color, size, shape) {
 function drawMinimap(ctx, view) {
   const w = 180, h = 180;
   ctx.clearRect(0, 0, w, h);
+  // Round minimap: clip the world to a circle (the CSS border-radius
+  // rounds the canvas box; the clip rounds the drawing itself).
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2);
+  ctx.clip();
   // The minimap shows the whole city (north up); the player arrow rotates.
   const scale = w / (CITY.x1 - CITY.x0 + 20);
   const { X, Z } = drawWorldBase(ctx, w, h, scale, CITY.x0 - 10, CITY.z0 - 10);
@@ -262,6 +293,7 @@ function drawMinimap(ctx, view) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+  ctx.restore(); // end the circular clip
 }
 
 // Full map for the pause screen: bigger, with district labels (measured).

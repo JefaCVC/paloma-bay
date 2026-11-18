@@ -78,7 +78,11 @@ class Chunked {
   flushIfNearLimit() {
     if (this.cur.vertexCount > 55000) {
       this.chunks.push(this.cur.build());
-      this.cur = new MeshBuilder();
+      // Clear the SAME builder instead of replacing it: buildWorld holds
+      // `bd = chunks.b`, and a fresh builder here would orphan every
+      // later write (the dense beachfront pushed the world past 55k verts
+      // mid-build, silently dropping the deep palms and the billboards).
+      this.cur.clear();
     }
   }
   finish() {
@@ -134,12 +138,14 @@ function buildBuilding(bd, b) {
 }
 
 // --- palm (segmented leaning trunk + folded 3-vertex fronds) ------------------
-function buildPalm(bd, x, z, leanDir, leanAmt, seed) {
+// `scale` grows the whole palm (taller beachfront specimens use 1.15–1.3).
+function buildPalm(bd, x, z, leanDir, leanAmt, seed, scale) {
+  const s = scale || 1;
   const rng = rng32((seed * 991 + 7) | 0);
   const baseY = 0.15;
   let px = x, pz = z, py = baseY;
   let r = 0.22;
-  const segH = 0.92;
+  const segH = 0.92 * s;
   for (let i = 0; i < 6; i++) {
     const t0 = i / 6, t1 = (i + 1) / 6;
     const ox0 = leanDir[0] * leanAmt * t0 * t0, oz0 = leanDir[1] * leanAmt * t0 * t0;
@@ -193,11 +199,11 @@ function buildPalm(bd, x, z, leanDir, leanAmt, seed) {
   };
   for (let i = 0; i < 9; i++) {
     const ang = (i / 9) * TAU + (rng() - 0.5) * 0.3;
-    const len = 2.6 + rng() * 0.8;
+    const len = (2.6 + rng() * 0.8) * s;
     const g = 0.42 + rng() * 0.12;
     frond(ang, len, 0.55 + rng() * 0.15, 1.0 + rng() * 0.25, [0.14 + rng() * 0.05, g, 0.20], seed + i * 0.37);
   }
-  frond(rng() * TAU, 2.2, -0.45, 0.7, [0.45, 0.32, 0.15], seed + 9.3); // dead frond
+  frond(rng() * TAU, 2.2 * s, -0.45, 0.7, [0.45, 0.32, 0.15], seed + 9.3); // dead frond
 }
 
 // Shade tree: trunk + jittered ellipsoid blobs in three greens.
@@ -263,6 +269,117 @@ function buildContainer(bd, x, z, yaw, color) {
   for (let i = -2; i <= 2; i++) {
     bd.box(i * 1.2 - 0.06, 0.2, -1.22, i * 1.2 + 0.06, 2.55, -1.18);
   }
+  bd.pop();
+}
+
+// --- billboards (beachfront ads) ------------------------------------------------
+// No 3D text exists in the material set, so each ad is a lit colour-block
+// face with geometric glyphs (discs, bars, a diamond) — the shape language
+// of a roadside board, readable from the chase camera. All brands are
+// original to Paloma Bay. Glyph: [kind, cx, cy, w, h, color]; cx/cy are
+// fractions of the panel (origin at panel centre), w/h fractions of panel
+// width/height, 'disc' uses w as radius (fraction of panel height).
+const BILLBOARDS = {
+  radio: { // Radio Paloma 88.5 — magenta + sun disc + wave bars
+    face: [0.95, 0.25, 0.55],
+    glyphs: [
+      ['disc', -0.30, 0.10, 0.18, 0, [1.0, 0.85, 0.25]],
+      ['quad', 0.12, -0.22, 0.50, 0.08, [1.0, 1.0, 1.0]],
+      ['quad', 0.12, 0.00, 0.50, 0.08, [1.0, 1.0, 1.0]],
+      ['quad', 0.12, 0.22, 0.50, 0.08, [1.0, 1.0, 1.0]],
+    ],
+  },
+  wheel: { // Paloma Wheel — teal + ferris-wheel ring + cabin dots
+    face: [0.10, 0.65, 0.75],
+    glyphs: [
+      ['disc', -0.26, 0.00, 0.32, 0, [1.0, 0.85, 0.25]],
+      ['disc', -0.26, 0.00, 0.23, 0, [0.10, 0.65, 0.75]],
+      ['disc', -0.26, 0.00, 0.06, 0, [1.0, 0.85, 0.25]],
+      ['disc', -0.35, 0.00, 0.05, 0, [0.95, 0.30, 0.25]],
+      ['disc', -0.17, 0.00, 0.05, 0, [0.95, 0.75, 0.20]],
+      ['disc', -0.26, 0.28, 0.05, 0, [0.30, 0.80, 0.40]],
+      ['disc', -0.26, -0.28, 0.05, 0, [1.0, 1.0, 1.0]],
+      ['quad', 0.20, -0.20, 0.42, 0.08, [1.0, 1.0, 1.0]],
+      ['quad', 0.20, 0.20, 0.42, 0.08, [1.0, 0.85, 0.25]],
+    ],
+  },
+  guns: { // Iron & Oak Guns — orange + crosshair
+    face: [0.95, 0.45, 0.10],
+    glyphs: [
+      ['quad', 0.00, 0.00, 0.04, 0.62, [1.0, 1.0, 1.0]],
+      ['quad', 0.00, 0.00, 0.52, 0.07, [1.0, 1.0, 1.0]],
+      ['disc', 0.00, 0.00, 0.09, 0, [0.80, 0.10, 0.10]],
+    ],
+  },
+  garage: { // Mara's Garage — blue + signal bars + headlamp dot
+    face: [0.15, 0.45, 0.95],
+    glyphs: [
+      ['disc', -0.33, 0.00, 0.15, 0, [1.0, 1.0, 1.0]],
+      ['quad', 0.10, 0.24, 0.55, 0.09, [1.0, 0.85, 0.25]],
+      ['quad', 0.10, 0.00, 0.55, 0.09, [1.0, 0.85, 0.25]],
+      ['quad', 0.10, -0.24, 0.55, 0.09, [1.0, 0.85, 0.25]],
+    ],
+  },
+  vireo: { // Vireo Import House — purple + diamond + gold bar
+    face: [0.55, 0.25, 0.85],
+    glyphs: [
+      ['diamond', -0.05, 0.05, 0.22, 0, [1.0, 1.0, 1.0]],
+      ['diamond', 0.32, 0.26, 0.08, 0, [1.0, 0.85, 0.25]],
+      ['quad', 0.00, -0.30, 0.52, 0.07, [1.0, 0.85, 0.25]],
+    ],
+  },
+};
+
+// Placement along the beachfront road (x 30–110). Yaw angles face the
+// boards west toward the eastbound chase camera: north-side boards
+// (z ≈ 92) yaw ≈ −1.05, sand-side boards (z ≈ 109–110) yaw ≈ −2.10.
+const BILLBOARD_SPOTS = [
+  { x: 36, z: 92, yaw: -1.05, w: 14, h: 5, design: BILLBOARDS.radio },
+  { x: 58, z: 110, yaw: -2.10, w: 20, h: 6.5, design: BILLBOARDS.wheel },
+  { x: 76, z: 92, yaw: -1.05, w: 13, h: 5, design: BILLBOARDS.guns },
+  { x: 92, z: 109, yaw: -2.10, w: 14, h: 5, design: BILLBOARDS.garage },
+  { x: 105, z: 110, yaw: -2.10, w: 12, h: 4.5, design: BILLBOARDS.vireo },
+];
+
+// Keep palms and shade trees clear of billboard panels and posts.
+function nearBillboard(x, z) {
+  return BILLBOARD_SPOTS.some((b) => Math.hypot(b.x - x, b.z - z) < 11);
+}
+
+// Two posts + a dark backing panel + a lit ad face with glyphs, all inside
+// one rotated frame so the board faces the road (face normal +Z local).
+function buildBillboard(bd, spot) {
+  const { x, z, yaw, w, h, design } = spot;
+  const postH = 8; // panel bottom height — clears palms, reads over traffic
+  bd.push(frame(x, 0, z, yaw, 0, 0, 1));
+  bd.setMat(MAT.METAL).setColor(0.25, 0.25, 0.27);
+  bd.tube([-w / 2 + 1.2, 0, 0], [-w / 2 + 1.2, postH, 0], 0.28, 0.22, 6, true);
+  bd.tube([w / 2 - 1.2, 0, 0], [w / 2 - 1.2, postH, 0], 0.28, 0.22, 6, true);
+  bd.box(-w / 2, postH - 0.3, -0.15, w / 2, postH + 0.1, 0.15);
+  bd.setMat(MAT.PLAIN).setColor(0.10, 0.10, 0.12);
+  bd.box(-w / 2, postH, -0.2, w / 2, postH + h, 0.2);
+  const f = design.face;
+  bd.setMat(MAT.EMIT).setColor(f[0], f[1], f[2]);
+  bd.quad(
+    [-w / 2 + 0.25, postH + 0.25, 0.24], [w / 2 - 0.25, postH + 0.25, 0.24],
+    [w / 2 - 0.25, postH + h - 0.25, 0.24], [-w / 2 + 0.25, postH + h - 0.25, 0.24],
+  );
+  design.glyphs.forEach((g, i) => {
+    const [kind, cx, cy, gw, gh, col] = g;
+    const gz = 0.32 + i * 0.02; // each glyph proud of the last (no z-fight)
+    bd.setColor(col[0], col[1], col[2]);
+    const gx = cx * w, gy = postH + h / 2 + cy * h;
+    if (kind === 'disc') {
+      bd.disc([gx, gy, gz], [0, 0, 1], gw * h, 20);
+    } else if (kind === 'diamond') {
+      const r = gw * h;
+      bd.quad([gx, gy + r, gz], [gx - r, gy, gz], [gx, gy - r, gz], [gx + r, gy, gz]);
+    } else {
+      const hw = (gw * w) / 2, hh = (gh * h) / 2;
+      bd.quad([gx - hw, gy - hh, gz], [gx + hw, gy - hh, gz],
+              [gx + hw, gy + hh, gz], [gx - hw, gy + hh, gz]);
+    }
+  });
   bd.pop();
 }
 
@@ -547,10 +664,23 @@ export function buildWorld() {
     bd.box(P.x - 14, 0.35, P.z + 0.5, P.x - 12.5, 1.4, P.z + 2);
   }
 
-  // Palms: beachfront rows + avenue lines + island.
+  // Palms: DENSE beachfront rows framing the z=100 beach road on both
+  // sides (tall, staggered, like a real palm-lined strand) + avenue
+  // lines + island. The beachfront is the cover shot's backdrop, so it
+  // reads lush from the chase camera, not a sparse dotted line.
   const palmSpots = [];
-  for (let x = -160; x <= 160; x += 16) palmSpots.push([x, 104, 5 + (x % 7)]);
-  for (let x = -160; x <= 160; x += 24) palmSpots.push([x, 96, 11 + (x % 5)]);
+  // North sidewalk row (tall, city side), step 9.
+  for (let x = -162; x <= 162; x += 9) palmSpots.push([x, 94, 5 + (x % 7), 1.15]);
+  // Sand-edge row (tall, beach side), offset half a step, step 9.
+  for (let x = -158; x <= 162; x += 9) {
+    if (Math.abs(x) < 7) continue; // keep the causeway mouth clear
+    palmSpots.push([x, 106, 11 + (x % 5), 1.2]);
+  }
+  // Deeper sand row (tallest), staggered, step 14.
+  for (let x = -154; x <= 162; x += 14) {
+    if (Math.abs(x) < 7 || Math.abs(x - 80) < 9) continue; // causeway + Ferris wheel
+    palmSpots.push([x, 112, 17 + (x % 9), 1.3]);
+  }
   for (const x of AVENUES) {
     for (let z = -90; z <= 90; z += 45) palmSpots.push([x + 6.5, z, 20 + z]);
   }
@@ -558,8 +688,18 @@ export function buildWorld() {
     const a = (i / 14) * TAU;
     palmSpots.push([ISLAND.cx + Math.cos(a) * (ISLAND.rx - 6), ISLAND.cz + Math.sin(a) * (ISLAND.rz - 6), 40 + i]);
   }
-  for (const [x, z, s] of palmSpots) {
-    buildPalm(bd, x, z, [rng() - 0.5, rng() - 0.5], 0.6 + rng() * 0.8, s);
+  for (const [x, z, s, sc] of palmSpots) {
+    if (nearBillboard(x, z)) continue; // never grow through a billboard
+    buildPalm(bd, x, z, [rng() - 0.5, rng() - 0.5], 0.6 + rng() * 0.8, s, sc || 1);
+    chunks.flushIfNearLimit();
+  }
+
+  // Shade trees along the beach promenade (deep sand, between the palms
+  // and the water) — the beach reads as a planted strand, not bare sand.
+  for (let x = -150; x <= 150; x += 22) {
+    if (Math.abs(x) < 8 || Math.abs(x - 80) < 10) continue; // causeway + Ferris wheel
+    if (nearBillboard(x, 120)) continue;
+    buildShadeTree(bd, x, 120, seedCounter++);
     chunks.flushIfNearLimit();
   }
 
@@ -582,12 +722,12 @@ export function buildWorld() {
     buildContainer(bd, x, z, (i % 2) * 0.15, contCols[i % 4]);
     colliders.push({ x0: x - 3.2, z0: z - 1.4, x1: x + 3.2, z1: z + 1.4 });
   }
-  // Billboard on La Rambla.
-  bd.setMat(MAT.METAL).setColor(0.25, 0.25, 0.27);
-  bd.tube([40, 0, 94], [40, 9, 94], 0.25, 0.2, 6, true);
-  bd.tube([52, 0, 94], [52, 9, 94], 0.25, 0.2, 6, true);
-  bd.setMat(MAT.EMIT).setColor(1.0, 0.65, 0.30);
-  bd.box(38, 9, 93.8, 54, 13.5, 94.2);
+  // Billboards along the beachfront road (5 lit panels, see
+  // BILLBOARD_SPOTS) — the strand's skyline, facing eastbound traffic.
+  for (const spot of BILLBOARD_SPOTS) {
+    buildBillboard(bd, spot);
+    chunks.flushIfNearLimit();
+  }
 
   // Rain puddles (GLASS discs on roads, drawn with alpha = wet).
   puddleBd.setMat(MAT.GLASS).setColor(0.35, 0.45, 0.55);

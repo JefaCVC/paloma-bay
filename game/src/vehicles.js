@@ -251,48 +251,87 @@ export function buildLightBar() {
 }
 
 // --- helicopter (PBPD AIR-1) ---------------------------------------------------
+// Rebuilt to read as a police helicopter at chase-cam distance: white PBPD
+// livery with a dark belly, a big glass canopy, a long tail boom with a
+// tall fin and stabiliser, skids, a searchlight, and a 4-blade main rotor.
+// Nose at -X, tail at +X (the draw code yaws -X toward the player).
+// Returns { body, rotor, tailRotor, cone }; the rotor meshes are built
+// centred on their spin axes (main rotor about Y, tail rotor about Z),
+// and the draw code translates the tail rotor onto the fin.
 export function buildHelicopter() {
   const bd = new MeshBuilder();
-  // Fuselage: rounded body + tail boom.
-  bd.setMat(MAT.PAINT).setColor(0.10, 0.12, 0.18);
-  bd.blob(0, 0, 0, 1.6, 1.0, 1.1, 11);
-  bd.setMat(MAT.PAINT).setColor(0.85, 0.85, 0.88);
-  bd.tube([1.2, 0.2, 0], [4.2, 0.55, 0], 0.45, 0.18, 8, true);
+  // Fuselage: white PBPD body + dark belly + engine deck.
+  bd.setMat(MAT.PAINT).setColor(0.92, 0.92, 0.94);
+  bd.blob(0, 0, 0, 2.1, 1.2, 1.3, 11);
+  bd.setMat(MAT.PAINT).setColor(0.10, 0.16, 0.38);
+  bd.blob(0, -0.5, 0, 1.8, 0.75, 1.05, 13);
+  bd.setMat(MAT.PLAIN).setColor(0.12, 0.12, 0.14);
+  bd.box(-0.7, 0.95, -0.55, 0.9, 1.3, 0.55); // engine deck
+  bd.setMat(MAT.METAL).setColor(0.45, 0.45, 0.48);
+  bd.tube([0.7, 1.05, -0.3], [1.15, 1.05, -0.3], 0.12, 0.10, 6, true); // exhaust
+  bd.tube([0.7, 1.05, 0.3], [1.15, 1.05, 0.3], 0.12, 0.10, 6, true);
+  // Canopy: big glass bubble on the nose, proud of the fuselage.
   bd.setMat(MAT.GLASS).setColor(0.55, 0.70, 0.78);
-  bd.blob(-1.1, 0.25, 0, 0.7, 0.7, 0.95, 12);
-  // Tail fin + skids + searchlight housing.
-  bd.setMat(MAT.PAINT).setColor(0.10, 0.12, 0.18);
-  bd.quad([3.6, 0.4, 0], [4.3, 0.5, 0], [4.3, 1.6, 0], [3.9, 1.5, 0]);
-  bd.setMat(MAT.METAL).setColor(0.5, 0.5, 0.52);
-  for (const sz of [-0.9, 0.9]) {
-    bd.tube([-1.2, -1.05, sz], [1.2, -1.05, sz], 0.06, 0.06, 6, true);
-    bd.tube([-0.8, -0.9, sz], [-0.8, -1.05, sz], 0.05, 0.05, 5, true);
-    bd.tube([0.8, -0.9, sz], [0.8, -1.05, sz], 0.05, 0.05, 5, true);
-  }
+  bd.blob(-1.5, 0.4, 0, 0.85, 0.8, 1.05, 12);
+  // Sensor ball + searchlight housing under the nose.
+  bd.setMat(MAT.METAL).setColor(0.30, 0.30, 0.32);
+  bd.blob(-1.7, -0.55, 0, 0.28, 0.28, 0.28, 14);
+  bd.setMat(MAT.PLAIN).setColor(0.15, 0.15, 0.17);
+  bd.box(-2.0, -0.75, -0.2, -1.6, -0.45, 0.2);
   bd.setMat(MAT.EMIT).setColor(1.0, 0.95, 0.7);
-  bd.disc([-1.5, -0.5, 0], [-1, -0.3, 0], 0.25, 10);
+  bd.disc([-2.02, -0.6, 0], [-1, -0.4, 0], 0.3, 12);
+  // Tail boom (dark blue) + tall fin + horizontal stabiliser.
+  bd.setMat(MAT.PAINT).setColor(0.10, 0.16, 0.38);
+  bd.tube([1.6, 0.25, 0], [5.2, 0.75, 0], 0.5, 0.2, 8, true);
+  bd.setMat(MAT.PAINT).setColor(0.92, 0.92, 0.94);
+  bd.quad([4.3, 0.5, 0], [5.2, 0.65, 0], [5.2, 2.1, 0], [4.6, 2.0, 0]);
+  bd.setMat(MAT.PAINT).setColor(0.10, 0.16, 0.38);
+  bd.box(4.3, 0.6, -1.05, 4.95, 0.72, 1.05); // stabiliser
+  // Skids, clear of the belly.
+  bd.setMat(MAT.METAL).setColor(0.5, 0.5, 0.52);
+  for (const sz of [-1.0, 1.0]) {
+    bd.tube([-1.5, -1.5, sz], [1.5, -1.5, sz], 0.07, 0.07, 6, true);
+    bd.tube([-1.0, -1.1, sz], [-1.0, -1.5, sz], 0.05, 0.05, 5, true);
+    bd.tube([1.0, -1.1, sz], [1.0, -1.5, sz], 0.05, 0.05, 5, true);
+  }
+  // Beacons: red on the fin tip + belly (always lit).
+  bd.setMat(MAT.EMIT).setColor(1.0, 0.15, 0.10);
+  bd.blob(5.1, 2.1, 0, 0.13, 0.13, 0.13, 15);
+  bd.blob(0, -1.3, 0, 0.11, 0.11, 0.11, 16);
   const body = bd.build();
 
-  // Main rotor: two long blades (rotates around Y at draw time).
+  // Main rotor: 4 blades (two long crossing boxes) with yellow tips +
+  // mast + hub, centred on the spin axis so the draw code's Y rotation
+  // spins it in place.
   const rb = new MeshBuilder();
   rb.setMat(MAT.PLAIN).setColor(0.12, 0.12, 0.14);
-  rb.box(-4.6, 1.15, -0.12, 4.6, 1.22, 0.12);
-  rb.box(-0.12, 1.15, -0.9, 0.12, 1.22, 0.9);
+  rb.box(-5.4, 1.5, -0.17, 5.4, 1.58, 0.17);
+  rb.box(-0.17, 1.5, -5.4, 0.17, 1.58, 5.4);
+  rb.setMat(MAT.EMIT).setColor(1.0, 0.85, 0.25); // yellow blade tips
+  rb.box(5.0, 1.5, -0.17, 5.4, 1.58, 0.17);
+  rb.box(-5.4, 1.5, -0.17, -5.0, 1.58, 0.17);
+  rb.box(-0.17, 1.5, 5.0, 0.17, 1.58, 5.4);
+  rb.box(-0.17, 1.5, -5.4, 0.17, 1.58, -5.0);
   rb.setMat(MAT.METAL).setColor(0.6, 0.6, 0.62);
-  rb.tube([0, 0.9, 0], [0, 1.18, 0], 0.12, 0.12, 6, true);
+  rb.tube([0, 1.05, 0], [0, 1.52, 0], 0.14, 0.14, 6, true);
+  rb.blob(0, 1.54, 0, 0.35, 0.16, 0.35, 17);
   const rotor = rb.build();
 
-  // Tail rotor.
+  // Tail rotor: 2-blade cross in the XY plane (parallel to the fin),
+  // centred on its hub at the origin — the draw code translates it onto
+  // the fin and spins it about Z.
   const tb = new MeshBuilder();
   tb.setMat(MAT.PLAIN).setColor(0.12, 0.12, 0.14);
-  tb.box(4.15, 0.2, -0.05, 4.35, 1.1, 0.05);
-  tb.box(4.15, 0.55, -0.45, 4.35, 0.75, 0.45);
+  tb.box(-0.06, -0.6, -0.05, 0.06, 0.6, 0.05);
+  tb.box(-0.6, -0.05, -0.05, 0.6, 0.05, 0.05);
+  tb.setMat(MAT.METAL).setColor(0.6, 0.6, 0.62);
+  tb.disc([0, 0, 0.06], [0, 0, 1], 0.13, 10);
   const tailRotor = tb.build();
 
   // Spotlight cone (drawn blended, apex at the heli, opening downward).
   const cb = new MeshBuilder();
   cb.setMat(MAT.EMIT).setColor(1.0, 0.95, 0.65);
-  const H = 16, R = 5;
+  const H = 18, R = 6;
   for (let i = 0; i < 12; i++) {
     const a0 = (i / 12) * TAU, a1 = ((i + 1) / 12) * TAU;
     cb.tri3([0, 0, 0], [Math.cos(a0) * R, -H, Math.sin(a0) * R], [Math.cos(a1) * R, -H, Math.sin(a1) * R]);

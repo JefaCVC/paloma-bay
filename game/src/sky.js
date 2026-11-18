@@ -31,10 +31,10 @@ const PRESETS = {
     windowLit: 0.08, name: 'Day',
   },
   dusk: {
-    sunDir: [-0.55, 0.28, 0.42], sunColor: [1.0, 0.58, 0.30], sunIntensity: 1.7,
-    zenith: [0.22, 0.38, 0.66], horizon: [1.0, 0.62, 0.36],
-    fogColor: [0.98, 0.66, 0.44], fogNear: 45, fogFar: 170,
-    ambSky: [0.52, 0.58, 0.74], ambGround: [0.46, 0.36, 0.30], ambStrength: 0.85,
+    sunDir: [-0.55, 0.20, 0.42], sunColor: [1.0, 0.50, 0.32], sunIntensity: 1.9, // lower sun, warmer
+    zenith: [0.26, 0.34, 0.62], horizon: [1.0, 0.52, 0.42], // warmer, pinker
+    fogColor: [0.99, 0.58, 0.45], fogNear: 45, fogFar: 170,
+    ambSky: [0.52, 0.58, 0.74], ambGround: [0.50, 0.36, 0.32], ambStrength: 0.85,
     windowLit: 0.55, name: 'Dusk',
   },
 };

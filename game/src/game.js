@@ -1245,6 +1245,8 @@ function hudView() {
     loadout,
     inCar: player.inCar,
     speed: player.inCar && player.car ? Math.abs(player.car.speed) : player.speed,
+    carName: player.inCar && player.car ? CAR_MODELS[player.car.model].name : '',
+    carHp: player.inCar && player.car ? player.car.hp : 100,
     health: player.hp,
     aiming: player.aiming > 0.3 && !player.inCar,
     interact: G.interactTarget ? G.interactTarget.label : null,
@@ -1480,12 +1482,15 @@ function renderFrame(t) {
     drawLit(heliMeshes.body, heliM, m4.multiply(vp, heliM), t, 1);
     const rotorM = m4.multiply(heliM, frame(0, 0, 0, h.rotor, 0, 0, 1));
     drawLit(heliMeshes.rotor, rotorM, m4.multiply(vp, rotorM), t, 1);
-    const tailM = m4.multiply(heliM, frame(0, 0, 0, 0, 0, h.rotor * 2, 1));
+    // Tail rotor: translate onto the fin hub, then spin about Z (its axle).
+    const tailM = m4.multiply(heliM, m4.multiply(
+      m4.translate(4.9, 1.45, 0.18), m4.rotateZ(h.rotor * 2),
+    ));
     drawLit(heliMeshes.tailRotor, tailM, m4.multiply(vp, tailM), t, 1);
     // Spotlight cone from the heli down to the player + ground disc.
     const coneM = frame(h.x, h.y - 1, h.z, 0, 0, 0, 1);
     drawLit(heliMeshes.cone, coneM, m4.multiply(vp, coneM), t, 0.14, true);
-    drawBlob(spotBlobMesh, m4.multiply(vp, frame(player.x, 0.06, player.z, 0, 0, 0, 1)), [1.0, 0.95, 0.7, 0.35]);
+    drawBlob(spotBlobMesh, m4.multiply(vp, frame(player.x, 0.06, player.z, 0, 0, 0, 1)), [1.0, 0.95, 0.7, 0.5]);
   }
 
   // Glass pass (car glass, blended, after opaque).
