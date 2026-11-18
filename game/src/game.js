@@ -216,7 +216,7 @@ function initWorld() {
     spawnCar(models[i % models.length], Math.floor(rng() * 3), av + 5.6, z, rng() > 0.5 ? 0 : Math.PI, 'parked');
   }
   // Theo's taxi at the safehouse.
-  spawnCar('taxi', 0, 15, -52, Math.PI / 2, 'parked');
+  spawnCar('taxi', 0, 15, -52, Math.PI, 'parked'); // Marlin Cab: faces west along the street, toward the first mission — never nose-first into the block's buildings.
   // Traffic cars on the roads.
   for (let i = 0; i < 8; i++) {
     const av = AVENUES[Math.floor(rng() * AVENUES.length)];
@@ -525,6 +525,8 @@ function respawnPlayer() {
   player.car = null;
   player.speed = 0;
   G.mode = 'play';
+  G.camera.yaw = player.yaw;
+  G.camView = updateCamera(2); // snap the camera behind the player, as in startPlay.
   showScreen(null);
 }
 
@@ -1633,6 +1635,11 @@ function wireScreens() {
   const startPlay = () => {
     initAudio();
     G.mode = 'play';
+    // Face the camera behind the player from the first frame: the spawn
+    // yaw is west (toward the taxi), so the camera starts east of the
+    // player instead of swinging in from the title orbit.
+    G.camera.yaw = player.yaw;
+    G.camView = updateCamera(2); // dt=2 saturates the damp: snap, don't sweep.
     showScreen(null);
     document.getElementById('hud').style.display = 'block';
     sfxClick();
