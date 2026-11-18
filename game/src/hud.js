@@ -8,10 +8,11 @@
 // Text never leaves its box: DOM panels wrap and clip by CSS; canvas text
 // is measured (measureText) before it is drawn. All UI text is English.
 
-import { AVENUES, CITY, DISTRICTS, ISLAND, POI, POSTCARDS, STREETS, WATER_Z } from './world.js';
-import { REP_TITLES, completionPercent } from './missions.js';
+import { AVENUES, CITY, DISTRICTS, ISLAND, PARK, POI, POSTCARDS, STREETS, WATER_Z } from './world.js';
+import { MISSIONS, REP_TITLES, completionPercent } from './missions.js';
 import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { clockLabel } from './sky.js';
+import { getVolume, isMuted, setMuted, setVolume } from './audio.js';
 
 // --- element handles ------------------------------------------------------------
 let el = {};
@@ -31,6 +32,63 @@ const WEAPON_ICONS = {
   bat: '<rect x="20" y="2" width="5" height="20" rx="2.5" transform="rotate(35 22 12)"/>',
 };
 
+// Character portraits: original flat-style SVG busts (96×96 viewBox),
+// one per story character — used by the choice dialog, mission dialogs,
+// the pause STORY tab and the title screen. Same flat cut-out language
+// as the weapon icons: bold shapes, no gradients, dark ink outlines.
+const PORTRAITS = {
+  theo: { name: 'Theo', svg:
+    '<rect width="96" height="96" rx="10" fill="#123a3a"/>'
+    + '<path d="M14 96C16 72 30 62 48 62C66 62 80 72 82 96Z" fill="#1f7a7a"/>'
+    + '<path d="M40 62L48 78L56 62L52 60L48 68L44 60Z" fill="#f5c542"/>'
+    + '<rect x="42" y="50" width="12" height="14" fill="#e8b98a"/>'
+    + '<ellipse cx="48" cy="40" rx="16" ry="18" fill="#e8b98a"/>'
+    + '<path d="M32 42C30 24 38 15 48 15C58 15 66 24 64 42C62 33 60 30 58 30C59 26 55 24 48 24C41 24 37 26 38 30C36 30 34 33 32 42Z" fill="#241a12"/>'
+    + '<circle cx="42" cy="39" r="2.2" fill="#1a1210"/><circle cx="54" cy="39" r="2.2" fill="#1a1210"/>'
+    + '<path d="M43 50Q48 53 53 50" stroke="#8a4a3a" stroke-width="2" fill="none" stroke-linecap="round"/>' },
+  mara: { name: 'Mara', svg:
+    '<rect width="96" height="96" rx="10" fill="#3a2a12"/>'
+    + '<path d="M14 96C16 72 30 62 48 62C66 62 80 72 82 96Z" fill="#2a7a8a"/>'
+    + '<rect x="36" y="60" width="6" height="12" fill="#c85a1e"/><rect x="54" y="60" width="6" height="12" fill="#c85a1e"/>'
+    + '<rect x="34" y="70" width="28" height="26" fill="#c85a1e"/>'
+    + '<rect x="42" y="50" width="12" height="14" fill="#eab98a"/>'
+    + '<ellipse cx="48" cy="40" rx="16" ry="18" fill="#eab98a"/>'
+    + '<path d="M32 42C30 24 38 15 48 15C58 15 66 24 64 42C62 33 60 30 58 30C59 26 55 24 48 24C41 24 37 26 38 30C36 30 34 33 32 42Z" fill="#6b3a1a"/>'
+    + '<path d="M62 24C72 24 75 38 70 47C66 43 63 34 62 24Z" fill="#6b3a1a"/>'
+    + '<circle cx="42" cy="39" r="2.2" fill="#1a1210"/><circle cx="54" cy="39" r="2.2" fill="#1a1210"/>'
+    + '<path d="M43 50Q48 53 53 50" stroke="#8a4a3a" stroke-width="2" fill="none" stroke-linecap="round"/>' },
+  zed: { name: 'Zed', svg:
+    '<rect width="96" height="96" rx="10" fill="#1a2a1a"/>'
+    + '<path d="M14 96C16 72 30 62 48 62C66 62 80 72 82 96Z" fill="#3a5a3a"/>'
+    + '<rect x="42" y="50" width="12" height="14" fill="#8a5a3a"/>'
+    + '<ellipse cx="48" cy="40" rx="16" ry="18" fill="#8a5a3a"/>'
+    + '<path d="M34 48C36 58 42 62 48 62C54 62 60 58 62 48C60 54 56 56 54 56C54 52 52 50 48 50C44 50 42 52 42 56C40 56 36 54 34 48Z" fill="#1a1210"/>'
+    + '<path d="M30 30C30 16 38 12 48 12C58 12 66 16 66 30L66 32L30 32Z" fill="#2a3a2a"/>'
+    + '<rect x="28" y="30" width="40" height="5" rx="2.5" fill="#1a2a1a"/>'
+    + '<circle cx="42" cy="39" r="2.2" fill="#14100e"/><circle cx="54" cy="39" r="2.2" fill="#14100e"/>' },
+  isadora: { name: 'Isadora', svg:
+    '<rect width="96" height="96" rx="10" fill="#2a1a3a"/>'
+    + '<path d="M14 96C16 72 30 62 48 62C66 62 80 72 82 96Z" fill="#7a2a8a"/>'
+    + '<rect x="42" y="50" width="12" height="14" fill="#f0c8a0"/>'
+    + '<ellipse cx="48" cy="40" rx="16" ry="18" fill="#f0c8a0"/>'
+    + '<path d="M28 44C26 20 36 12 48 12C60 12 70 20 68 44L68 58C64 52 62 50 60 50L60 34C58 26 54 22 48 22C42 22 38 26 36 34L36 50C34 50 32 52 28 58Z" fill="#14101a"/>'
+    + '<circle cx="33" cy="52" r="2.5" fill="#f5c542"/><circle cx="63" cy="52" r="2.5" fill="#f5c542"/>'
+    + '<circle cx="42" cy="39" r="2.2" fill="#1a1210"/><circle cx="54" cy="39" r="2.2" fill="#1a1210"/>'
+    + '<path d="M43 50Q48 53 53 50" stroke="#a03040" stroke-width="2" fill="none" stroke-linecap="round"/>' },
+};
+
+function portraitSVG(key, size) {
+  const p = PORTRAITS[key] || PORTRAITS.theo;
+  return '<svg viewBox="0 0 96 96" width="' + size + '" height="' + size + '" aria-hidden="true">' + p.svg + '</svg>';
+}
+function portraitFor(name) {
+  const n = (name || '').toUpperCase();
+  if (n.includes('MARA')) return 'mara';
+  if (n.includes('ZED')) return 'zed';
+  if (n.includes('ISADORA') || n.includes('VIREO')) return 'isadora';
+  return 'theo';
+}
+
 export function initHUD() {
   const ids = [
     'hud', 'wanted-stars', 'cash', 'rep-title', 'loyalty-bar', 'loyalty-val',
@@ -39,16 +97,20 @@ export function initHUD() {
     'response-panel', 'response-rows',
     'mission-panel', 'mission-name', 'mission-stage', 'mission-objective',
     'mission-dist', 'mission-next', 'chatter',
-    'weapon-name', 'weapon-slots', 'speed', 'speed-wrap', 'car-name', 'car-cond-bar', 'hint',
-    'crosshair', 'interact', 'dialog', 'dialog-speaker', 'dialog-text',
+    'weapon-name', 'weapon-slots', 'speed-wrap', 'car-name', 'car-cond-bar', 'hint',
+    'speedo-needle', 'speedo-num',
+    'vitals-hp-bar', 'vitals-hp-val', 'vitals-armor-bar', 'vitals-armor-val',
+    'crosshair', 'interact', 'dialog', 'dialog-speaker', 'dialog-text', 'dialog-portrait',
     'choices', 'banner', 'banner-title', 'banner-sub', 'toast', 'vignette',
-    'health-bar', 'health-wrap',
-    'title-screen', 'pause-screen', 'map-canvas', 'pause-missions',
-    'pause-stats', 'pause-garage', 'pause-saves',
+    'title-screen', 'title-portraits', 'pause-screen', 'map-canvas', 'pause-saves',
+    'pause-clock', 'pause-complete-bar', 'pause-complete-val',
+    'pause-progress', 'pause-job', 'pause-crew',
+    'pause-center-map', 'pause-center-stats', 'pause-center-story', 'pause-center-settings',
+    'pause-stats-body', 'pause-story-body', 'pause-settings-body',
     'shop-screen', 'shop-title', 'shop-items',
     'ending-screen', 'ending-name', 'ending-title', 'ending-desc', 'ending-stats',
     'dead-screen', 'dead-title', 'dead-sub',
-    'howto-panel',
+    'controls-panel', 'settings-panel',
   ];
   for (const id of ids) el[id] = document.getElementById(id);
   if (el.minimap) minimapCtx = el.minimap.getContext('2d');
@@ -143,23 +205,36 @@ export function updateHUD(view) {
     }).join('');
     if (el['weapon-slots'].innerHTML !== slots) el['weapon-slots'].innerHTML = slots;
   }
-  // Bottom-right: radio + big speed (car name + condition bar + huge speed).
+  // Bottom-right: radio + ROUND speedometer (dial + needle + digital
+  // km/h in the middle) with the car name + condition bar.
   if (el['speed-wrap']) {
     el['speed-wrap'].style.display = view.inCar ? 'block' : 'none';
     setText(el['car-name'], view.carName || '');
-    setText(el.speed, String(Math.round(view.speed * 3.6)));
+    const kmh = Math.round(view.speed * 3.6);
+    setText(el['speedo-num'], String(kmh));
+    if (el['speedo-needle']) {
+      // Needle sweeps -120°..+120° for 0..200 km/h (SVG transform attr).
+      const ang = -120 + (Math.min(200, Math.max(0, kmh)) / 200) * 240;
+      el['speedo-needle'].setAttribute('transform', 'rotate(' + ang.toFixed(1) + ' 70 70)');
+    }
     if (el['car-cond-bar']) {
       const hp = view.carHp === undefined || view.carHp === null ? 100 : view.carHp;
       el['car-cond-bar'].style.width = Math.max(0, Math.min(100, hp)) + '%';
       el['car-cond-bar'].style.background = hp > 50 ? 'var(--green)' : hp > 25 ? 'var(--amber)' : 'var(--red)';
     }
   }
-  setText(el.hint, view.hint || '');
-  // Health bar.
-  if (el['health-wrap']) {
-    el['health-wrap'].style.display = view.health < 100 ? 'block' : 'none';
-    if (el['health-bar']) el['health-bar'].style.width = Math.max(0, view.health) + '%';
+  // Top-right, under the weapon bar: HP + ARMOR bars (always visible —
+  // the combat frame must read them at a glance).
+  if (el['vitals-hp-bar']) {
+    el['vitals-hp-bar'].style.width = Math.max(0, Math.min(100, view.health)) + '%';
+    setText(el['vitals-hp-val'], String(Math.round(view.health)));
   }
+  if (el['vitals-armor-bar']) {
+    const arm = view.armor === undefined || view.armor === null ? 0 : view.armor;
+    el['vitals-armor-bar'].style.width = Math.max(0, Math.min(100, arm)) + '%';
+    setText(el['vitals-armor-val'], String(Math.round(arm)));
+  }
+  setText(el.hint, view.hint || '');
   // Crosshair + interact prompt.
   if (el.crosshair) el.crosshair.style.display = view.aiming ? 'block' : 'none';
   if (el.interact) {
@@ -191,6 +266,24 @@ function drawWorldBase(ctx, w, h, scale, ox, oy) {
   // Mainland ground.
   ctx.fillStyle = '#3f4a3a';
   ctx.fillRect(X(CITY.x0), Z(CITY.z0), (CITY.x1 - CITY.x0) * scale, (100 - CITY.z0) * scale);
+  // District tints (soft, so the map reads as neighbourhoods, not one slab).
+  const DISTRICT_TINTS = {
+    'Porto Lumen': 'rgba(90,140,180,0.16)',
+    'Ciudad Vieja': 'rgba(200,170,90,0.16)',
+    'North Docks': 'rgba(130,130,140,0.16)',
+    'Palm Heights': 'rgba(90,180,120,0.16)',
+    'Barrio Sol': 'rgba(220,140,60,0.16)',
+    'La Rambla': 'rgba(220,90,140,0.16)',
+    'Isla Verde': 'rgba(60,160,140,0.16)',
+  };
+  for (const d of DISTRICTS) {
+    const [x0, x1, z0, z1] = d.region;
+    ctx.fillStyle = DISTRICT_TINTS[d.name] || 'rgba(255,255,255,0.05)';
+    ctx.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale);
+  }
+  // Rambla Park green.
+  ctx.fillStyle = '#2e6b2e';
+  ctx.fillRect(X(PARK.x0), Z(PARK.z0), (PARK.x1 - PARK.x0) * scale, (PARK.z1 - PARK.z0) * scale);
   // Beach sand.
   ctx.fillStyle = '#b8a86a';
   ctx.fillRect(X(CITY.x0), Z(100), (CITY.x1 - CITY.x0) * scale, (WATER_Z - 100) * scale);
@@ -276,6 +369,11 @@ function drawMinimap(ctx, view) {
   if (view.police.heli) {
     drawBlip(ctx, X, Z, view.police.heli.x, view.police.heli.z, '#4a90ff', 4, 'diamond');
   }
+  // Hostiles: red dots with a white ring, so they read at a glance.
+  for (const e of view.enemies || []) {
+    drawBlip(ctx, X, Z, e.x, e.z, '#ffffff', 4.5, 'circle');
+    drawBlip(ctx, X, Z, e.x, e.z, '#ff2a2a', 3.5, 'circle');
+  }
   // Player arrow (rotates with yaw).
   const px = X(view.player.x), pz = Z(view.player.z);
   ctx.save();
@@ -305,6 +403,51 @@ export function drawFullMap(view) {
   ctx.clearRect(0, 0, w, h);
   const scale = Math.min(w / 480, h / 420);
   const { X, Z } = drawWorldBase(ctx, w, h, scale, -240, -175);
+  // Coordinate grid: faint lines + A–F columns / 1–6 rows on the edges.
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx.lineWidth = 1;
+  ctx.font = 'bold 10px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  const colLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+  for (let i = 0; i < 6; i++) {
+    const gx = -240 + i * 80 + 40;
+    ctx.beginPath();
+    ctx.moveTo(X(gx), 0);
+    ctx.lineTo(X(gx), h);
+    ctx.stroke();
+    ctx.fillText(colLetters[i], X(gx) - 3, 12);
+  }
+  for (let i = 0; i < 6; i++) {
+    const gz = -175 + i * 70 + 35;
+    ctx.beginPath();
+    ctx.moveTo(0, Z(gz));
+    ctx.lineTo(w, Z(gz));
+    ctx.stroke();
+    ctx.fillText(String(i + 1), 4, Z(gz) + 3);
+  }
+  // GPS route: a dashed yellow line from the player to the mission
+  // objective, routed along the street grid (Manhattan path).
+  if (view.mission && view.mission.active && view.mission.mx !== undefined) {
+    const px = X(view.player.x), pz = Z(view.player.z);
+    const mx = X(view.mission.mx), mz = Z(view.mission.mz);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,210,62,0.35)';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(px, pz);
+    ctx.lineTo(mx, pz);
+    ctx.lineTo(mx, mz);
+    ctx.stroke();
+    ctx.strokeStyle = '#ffd23e';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([9, 6]);
+    ctx.beginPath();
+    ctx.moveTo(px, pz);
+    ctx.lineTo(mx, pz);
+    ctx.lineTo(mx, mz);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   // Labels are clamped to the canvas: no text may leave the map.
   const clampLabel = (x, y, tw) => [
     Math.max(4, Math.min(w - tw - 4, x)),
@@ -338,19 +481,44 @@ export function drawFullMap(view) {
     ctx.strokeText(name, lx, ly);
     ctx.fillText(name, lx, ly);
   }
+  // Rambla Park label.
+  {
+    const tw = ctx.measureText('Rambla Park').width;
+    const [lx, ly] = clampLabel(X((PARK.x0 + PARK.x1) / 2) - tw / 2, Z((PARK.z0 + PARK.z1) / 2) - 4, tw);
+    ctx.strokeText('Rambla Park', lx, ly);
+    ctx.fillText('Rambla Park', lx, ly);
+  }
   const collected = new Set(view.profile.postcards);
   POSTCARDS.forEach(([x, z], i) => {
     if (!collected.has(i)) drawBlip(ctx, X, Z, x, z, '#f5c542', 3, 'circle');
   });
-  drawBlip(ctx, X, Z, POI.garage.x, POI.garage.z, '#4da6ff', 5, 'circle');
-  drawBlip(ctx, X, Z, POI.gunshop.x, POI.gunshop.z, '#ff6b4a', 5, 'circle');
-  drawBlip(ctx, X, Z, POI.safehouse.x, POI.safehouse.z, '#7ddb52', 5, 'circle');
-  drawBlip(ctx, X, Z, POI.pawn.x, POI.pawn.z, '#c07df0', 5, 'circle');
+  // POI blips with letter icons (the legend explains each letter).
+  const poiBlips = [
+    [POI.garage, '#4da6ff', 'G'], [POI.gunshop, '#ff6b4a', 'A'],
+    [POI.safehouse, '#7ddb52', 'H'], [POI.pawn, '#c07df0', 'P'],
+    [POI.vireoHQ, '#a04ae0', 'V'], [POI.ferris, '#ff9ad5', 'W'],
+    [POI.lighthouse, '#ffffff', 'L'], [POI.pier, '#c89a5a', 'D'],
+  ];
+  ctx.font = 'bold 10px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const [poi, color, letter] of poiBlips) {
+    drawBlip(ctx, X, Z, poi.x, poi.z, color, 7, 'circle');
+    ctx.fillStyle = color === '#ffffff' ? '#111111' : '#ffffff';
+    ctx.fillText(letter, X(poi.x), Z(poi.z) + 0.5);
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
   if (view.mission && view.mission.active && view.mission.mx !== undefined) {
     drawBlip(ctx, X, Z, view.mission.mx, view.mission.mz, '#ffd23e', 8, 'diamond');
   }
   for (const u of view.police.units) {
     drawBlip(ctx, X, Z, u.x, u.z, '#4a90ff', 4, 'circle');
+  }
+  // Hostiles: red dots with a white ring.
+  for (const e of view.enemies || []) {
+    drawBlip(ctx, X, Z, e.x, e.z, '#ffffff', 6, 'circle');
+    drawBlip(ctx, X, Z, e.x, e.z, '#ff2a2a', 4.5, 'circle');
   }
   const px = X(view.player.x), pz = Z(view.player.z);
   ctx.save();
@@ -373,21 +541,36 @@ export function drawFullMap(view) {
 // --- dialog / choices / banners / toasts -----------------------------------------
 export function showDialog(speaker, text) {
   if (!el.dialog) return;
-  el.dialog.style.display = 'block';
+  el.dialog.style.display = 'flex';
   setText(el['dialog-speaker'], speaker);
   setText(el['dialog-text'], text);
+  if (el['dialog-portrait']) el['dialog-portrait'].innerHTML = portraitSVG(portraitFor(speaker), 64);
 }
 export function hideDialog() {
   if (el.dialog) el.dialog.style.display = 'none';
 }
 
-export function showChoices(stage, onPick) {
+export function showChoices(stage, giver, onPick) {
   if (!el.choices) return;
   el.choices.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'choices-row';
+  const port = document.createElement('div');
+  port.className = 'choices-portrait';
+  port.innerHTML = portraitSVG(portraitFor(giver || ''), 96);
+  row.appendChild(port);
+  const body = document.createElement('div');
+  body.className = 'choices-body';
+  if (giver) {
+    const who = document.createElement('div');
+    who.className = 'choices-giver';
+    who.textContent = giver.toUpperCase();
+    body.appendChild(who);
+  }
   const title = document.createElement('div');
   title.className = 'choices-title';
   title.textContent = stage.text;
-  el.choices.appendChild(title);
+  body.appendChild(title);
   stage.options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
@@ -400,8 +583,10 @@ export function showChoices(stage, onPick) {
     btn.appendChild(label);
     btn.appendChild(sub);
     btn.addEventListener('click', () => onPick(i));
-    el.choices.appendChild(btn);
+    body.appendChild(btn);
   });
+  row.appendChild(body);
+  el.choices.appendChild(row);
   el.choices.style.display = 'block';
 }
 export function hideChoices() {
@@ -441,37 +626,133 @@ export function showScreen(name) {
   if (el.hud) el.hud.style.display = name === null ? 'block' : 'none';
 }
 
-export function fillPauseScreen(view) {
+const CREW_ROLES = {
+  theo: 'Night-taxi driver',
+  mara: 'Runs the garage',
+  zed: "Fixer · Zed's Pawn",
+  isadora: 'La Paloma · Vireo family',
+};
+
+export function fillTitleScreen() {
+  const wrap = el['title-portraits'];
+  if (!wrap) return;
+  wrap.innerHTML = ['theo', 'mara', 'zed', 'isadora'].map((k) =>
+    '<div class="title-char">' + portraitSVG(k, 56) + '<span>' + PORTRAITS[k].name + '</span></div>'
+  ).join('');
+}
+
+export function fillPauseScreen(view, tab) {
+  const t = tab || 'map';
   const p = view.profile;
-  if (el['pause-missions']) {
-    const rows = view.missionList.map((m) => {
-      const state = m.done ? 'DONE' : m.unlocked ? 'AVAILABLE' : 'LOCKED';
-      const cls = m.done ? 'done' : m.unlocked ? 'open' : 'locked';
-      return '<div class="prow ' + cls + '"><span>' + m.id + '. ' + escapeHtml(m.name) + '</span><span>' + state + '</span></div>';
-    }).join('');
-    el['pause-missions'].innerHTML = rows;
+  // Top bar: day/time/played + completion.
+  setText(el['pause-clock'], 'DAY ' + view.day + ' · ' + clockLabel(view.hour) + ' · PLAYED ' + (view.playTime || '0m'));
+  const pct = completionPercent(p);
+  if (el['pause-complete-bar']) el['pause-complete-bar'].style.width = pct + '%';
+  setText(el['pause-complete-val'], pct + '% COMPLETE');
+  // Tabs + center panels.
+  document.querySelectorAll('.pause-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
+  for (const name of ['map', 'stats', 'story', 'settings']) {
+    const panel = el['pause-center-' + name];
+    if (panel) panel.style.display = name === t ? 'block' : 'none';
   }
-  if (el['pause-stats']) {
+  // Left: PROGRESS tiles.
+  if (el['pause-progress']) {
     const s = p.stats;
-    el['pause-stats'].innerHTML =
-      '<div class="prow"><span>Completion</span><span>' + completionPercent(p) + '%</span></div>' +
-      '<div class="prow"><span>Cash</span><span>$' + Math.floor(p.cash).toLocaleString('en-US') + '</span></div>' +
-      '<div class="prow"><span>Reputation</span><span>' + REP_TITLES[p.rep] + '</span></div>' +
-      '<div class="prow"><span>Postcards</span><span>' + p.postcards.length + ' / 20</span></div>' +
-      '<div class="prow"><span>Enemies down</span><span>' + s.kills + '</span></div>' +
-      '<div class="prow"><span>Cars stolen</span><span>' + s.carsStolen + '</span></div>' +
-      '<div class="prow"><span>Distance driven</span><span>' + (s.distanceDriven / 1000).toFixed(1) + ' km</span></div>' +
-      '<div class="prow"><span>Endings seen</span><span>' + (p.endingsSeen || []).length + ' / 3</span></div>';
+    const tiles = [
+      ['STORY JOBS', p.missionsDone.length + ' / 8'],
+      ['CASH', '$' + Math.floor(p.cash).toLocaleString('en-US')],
+      ['POSTCARDS', p.postcards.length + ' / 20'],
+      ['REPUTATION', REP_TITLES[p.rep]],
+      ['ENEMIES DOWN', String(s.kills)],
+      ['CARS STOLEN', String(s.carsStolen)],
+      ['DISTANCE', (s.distanceDriven / 1000).toFixed(1) + ' km'],
+      ['ENDINGS SEEN', (p.endingsSeen || []).length + ' / 3'],
+    ];
+    el['pause-progress'].innerHTML = tiles.map(([k, v]) =>
+      '<div class="ptile"><span class="ptile-k">' + k + '</span><span class="ptile-v">' + v + '</span></div>'
+    ).join('');
   }
-  if (el['pause-garage']) {
-    const u = p.upgrades;
-    el['pause-garage'].innerHTML =
-      '<div class="prow"><span>Engine</span><span>' + (u.engine ? 'LVL 2 ✓' : 'STOCK') + '</span></div>' +
-      '<div class="prow"><span>Armour</span><span>' + (u.armour ? 'FITTED ✓' : 'NONE') + '</span></div>' +
-      '<div class="prow"><span>Nitro</span><span>' + (u.nitro ? 'READY ✓' : 'LOCKED') + '</span></div>' +
-      '<div class="prow"><span>Resprays</span><span>' + (u.respray || 0) + '</span></div>';
+  // Left: CURRENT JOB.
+  if (el['pause-job']) {
+    const m = view.mission;
+    if (m && m.active) {
+      el['pause-job'].innerHTML =
+        '<div class="job-name">' + escapeHtml(m.name) + '</div>'
+        + '<div class="job-obj">' + escapeHtml(m.objective || '') + '</div>'
+        + '<div class="prow"><span>Stage</span><span>' + (m.stageIndex + 1) + ' / ' + m.stages + '</span></div>'
+        + (m.dist !== null && m.dist !== undefined
+          ? '<div class="prow"><span>GPS distance</span><span>' + Math.round(m.dist) + ' m</span></div>' : '');
+    } else {
+      el['pause-job'].innerHTML = '<div class="job-obj">No active job — drive to the marker to start the next mission.</div>';
+    }
   }
-  drawFullMap(view);
+  // Right: CREW portraits.
+  if (el['pause-crew']) {
+    el['pause-crew'].innerHTML = ['theo', 'mara', 'zed', 'isadora'].map((k) =>
+      '<div class="crew-row">' + portraitSVG(k, 40)
+      + '<div><div class="crew-name">' + PORTRAITS[k].name + '</div>'
+      + '<div class="crew-role">' + CREW_ROLES[k] + '</div></div></div>'
+    ).join('');
+  }
+  // Center content per tab.
+  if (t === 'map') {
+    drawFullMap(view);
+  } else if (t === 'stats') {
+    if (el['pause-stats-body']) {
+      const s = p.stats;
+      const u = p.upgrades;
+      el['pause-stats-body'].innerHTML =
+        '<h4>STATS</h4>'
+        + '<div class="prow"><span>Completion</span><span>' + pct + '%</span></div>'
+        + '<div class="prow"><span>Cash</span><span>$' + Math.floor(p.cash).toLocaleString('en-US') + '</span></div>'
+        + '<div class="prow"><span>Reputation</span><span>' + REP_TITLES[p.rep] + '</span></div>'
+        + '<div class="prow"><span>Postcards</span><span>' + p.postcards.length + ' / 20</span></div>'
+        + '<div class="prow"><span>Enemies down</span><span>' + s.kills + '</span></div>'
+        + '<div class="prow"><span>Cars stolen</span><span>' + s.carsStolen + '</span></div>'
+        + '<div class="prow"><span>Distance driven</span><span>' + (s.distanceDriven / 1000).toFixed(1) + ' km</span></div>'
+        + '<div class="prow"><span>Money earned</span><span>$' + Math.floor(s.moneyEarned || 0).toLocaleString('en-US') + '</span></div>'
+        + '<div class="prow"><span>Endings seen</span><span>' + (p.endingsSeen || []).length + ' / 3</span></div>'
+        + '<h4>GARAGE — MARA\'S</h4>'
+        + '<div class="prow"><span>Engine</span><span>' + (u.engine ? 'LVL 2 ✓' : 'STOCK') + '</span></div>'
+        + '<div class="prow"><span>Armour</span><span>' + (u.armour ? 'FITTED ✓' : 'NONE') + '</span></div>'
+        + '<div class="prow"><span>Nitro</span><span>' + (u.nitro ? 'READY ✓' : 'LOCKED') + '</span></div>'
+        + '<div class="prow"><span>Resprays</span><span>' + (u.respray || 0) + '</span></div>';
+    }
+  } else if (t === 'story') {
+    if (el['pause-story-body']) {
+      el['pause-story-body'].innerHTML = MISSIONS.map((m) => {
+        const state = view.missionList.find((x) => x.id === m.id);
+        const done = state && state.done;
+        const unlocked = state && state.unlocked;
+        const status = done ? 'COMPLETE' : unlocked ? 'IN PROGRESS' : 'LOCKED';
+        const cls = done ? 'done' : unlocked ? 'open' : 'locked';
+        return '<div class="story-row ' + cls + '">' + portraitSVG(portraitFor(m.giver), 48)
+          + '<div class="story-main"><div class="story-name">' + m.id + '. ' + escapeHtml(m.name) + '</div>'
+          + '<div class="story-brief">' + escapeHtml(m.brief) + '</div>'
+          + '<div class="story-meta">' + escapeHtml(m.giver) + ' · ' + escapeHtml(m.district) + ' · $' + m.payout + '</div></div>'
+          + '<span class="story-status">' + status + '</span></div>';
+      }).join('');
+    }
+  } else if (t === 'settings') {
+    if (el['pause-settings-body']) {
+      el['pause-settings-body'].innerHTML =
+        '<h4>SETTINGS</h4>'
+        + '<div class="set-row"><span>Volume</span><input type="range" id="pause-volume" min="0" max="100" value="' + Math.round(getVolume() * 100) + '"><span id="pause-volume-val">' + Math.round(getVolume() * 100) + '%</span></div>'
+        + '<div class="set-row"><span>Sound</span><button class="btn" id="pause-mute">' + (isMuted() ? 'SOUND: OFF' : 'SOUND: ON') + '</button></div>'
+        + '<div class="set-note">Q / E switch tabs · M or Esc resumes · Saves live in the left column.</div>';
+      const slider = document.getElementById('pause-volume');
+      const val = document.getElementById('pause-volume-val');
+      if (slider) slider.addEventListener('input', () => {
+        setVolume(Number(slider.value) / 100);
+        if (val) val.textContent = slider.value + '%';
+      });
+      const mute = document.getElementById('pause-mute');
+      if (mute) mute.addEventListener('click', () => {
+        setMuted(!isMuted());
+        mute.textContent = isMuted() ? 'SOUND: OFF' : 'SOUND: ON';
+      });
+    }
+  }
 }
 
 export function fillShopScreen(kind, view, onBuy) {

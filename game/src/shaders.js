@@ -100,12 +100,18 @@ void main() {
     float seedI = floor(vSeed + 0.5);
     float style = floor(seedI / 100.0);
     float hseed = seedI - style * 100.0;
-    float fl = floor(vUV.y);
-    float co = floor(vUV.x);
-    vec2 cell = fract(vUV);
+    // Three window patterns, picked per building from the seed: standard
+    // grid, wide windows, staggered rows — no two neighbours read alike.
+    float pattern = mod(hseed, 3.0);
+    vec2 wuv = vUV;
+    if (pattern > 0.5 && pattern < 1.5) wuv = vec2(vUV.x * 0.62, vUV.y);
+    float fl = floor(wuv.y);
+    float co = floor(wuv.x);
+    vec2 cell = fract(wuv);
+    if (pattern > 1.5) cell.x = fract(wuv.x + mod(fl, 2.0) * 0.5);
     float lit = step(1.0 - uWindowLit, hash21(vec2(co * 1.7 + hseed, fl * 2.3 + hseed)));
-    float winX = step(0.20, cell.x) * step(cell.x, 0.80);
-    float winY = step(0.28, cell.y) * step(cell.y, 0.82);
+    float winX = step(0.16, cell.x) * step(cell.x, 0.84);
+    float winY = step(0.24, cell.y) * step(cell.y, 0.86);
     float win = winX * winY;
     vec3 litWall = base * (amb + uSunColor * uSunIntensity * ndl);
     vec3 glassCol = mix(vec3(0.10, 0.14, 0.20), skyRef, 0.25 + 0.55 * fres);

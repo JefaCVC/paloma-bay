@@ -33,16 +33,16 @@ import {
   createPolice, setWanted, syncUnits, updatePolice,
 } from './police.js';
 import {
-  currentStation, currentTrack, initAudio, isMuted, nextStation,
-  setMuted, sfxCash, sfxClick, sfxHit, sfxHorn, sfxMissionComplete,
+  currentStation, currentTrack, getVolume, initAudio, isMuted, nextStation,
+  setMuted, setVolume, sfxCash, sfxClick, sfxHit, sfxHorn, sfxMissionComplete,
   sfxPickup, sfxShoot, sfxWasted, updateAudio,
 } from './audio.js';
 import { createGameState, hasSave, loadGame, saveGame, saveSlotInfo } from './save.js';
 import { createInput, exitPointerLock, requestPointerLock } from './input.js';
 import {
   fillDeadScreen, fillEndingScreen, fillPauseScreen, fillShopScreen,
-  hideChoices, hideDialog, initHUD, showBanner, showChoices, showDialog,
-  showScreen, toast, updateHUD,
+  fillTitleScreen, hideChoices, hideDialog, initHUD, showBanner, showChoices,
+  showDialog, showScreen, toast, updateHUD,
 } from './hud.js';
 import { stageShot } from './shots.js';
 
@@ -82,7 +82,7 @@ const missions = () => G.state.missions;
 // Player: on foot or in a car. Position is always world (x, z); y = 0.
 const player = {
   x: 18, z: -52, yaw: Math.PI, speed: 0, vx: 0, vz: 0,
-  hp: 100, inCar: false, car: null,
+  hp: 100, armor: 50, inCar: false, car: null,
   phase: 0, dist: 0, walking: 0, aiming: 0, aimYaw: 0,
   reloadTimer: 0, fireTimer: 0, swing: 0, swingTimer: 0,
   flashTimer: 0, flashAt: null, tracerTimer: 0, tracerFrom: null, tracerTo: null,
@@ -106,6 +106,7 @@ let postcardMesh = null;
 let ammoMesh = null;
 let flashMesh = null;
 let tracerMesh = null; // unit tracer (1 unit long), scaled per shot
+let markerMesh = null; // enemy marker: crossed red arrows above hostile heads
 let ferrisMesh = null;
 let staticMeshes = [];
 let puddleMesh = null;
@@ -170,6 +171,7 @@ function spawnEnemy(x, z, kind, weapon) {
     state: 'approach', fireTimer: 1 + Math.random(),
     kind: kind || 'thug', dead: false, deadT: 0, phase: 0, dist: 0,
     speed: 0, walking: 0, aiming: 0,
+    flashTimer: 0, flashAt: null, tracerTimer: 0, tracerFrom: null, tracerTo: null,
   };
   enemies.push(e);
   return e;
@@ -201,6 +203,20 @@ function initWorld() {
     tb.setMat(MAT.EMIT).setColor(1.0, 0.9, 0.5);
     tb.box(-0.5, -0.02, -0.02, 0.5, 0.02, 0.02);
     tracerMesh = uploadMesh(tb.build(), false);
+  }
+  // Enemy marker: two crossed downward triangles (bright red with a
+  // white core), so the arrow reads from any viewing angle.
+  {
+    const mb = new MeshBuilder();
+    mb.setMat(MAT.EMIT).setColor(1.0, 0.12, 0.12);
+    mb.tri3([-0.38, 0.32, 0], [0.38, 0.32, 0], [0, -0.36, 0]);
+    mb.tri3([0, 0.32, -0.38], [0, 0.32, 0.38], [0, -0.36, 0]);
+    mb.setColor(1.0, 1.0, 1.0);
+    mb.tri3([-0.20, 0.22, 0.02], [0.20, 0.22, 0.02], [0, -0.18, 0.02]);
+    mb.tri3([-0.20, 0.22, -0.02], [0.20, 0.22, -0.02], [0, -0.18, -0.02]);
+    mb.tri3([0.02, 0.22, -0.20], [0.02, 0.22, 0.20], [0.02, -0.18, 0]);
+    mb.tri3([-0.02, 0.22, -0.20], [-0.02, 0.22, 0.20], [-0.02, -0.18, 0]);
+    markerMesh = uploadMesh(mb.build(), false);
   }
   ferrisMesh = uploadMesh(buildFerrisWheel(), false);
   carBlobMesh = uploadBlob(discBlob(2.8, 1.6, 24));
@@ -336,6 +352,10 @@ function updateOnFoot(dt) {
   }
   if (player.flashTimer > 0) player.flashTimer -= dt;
   if (player.tracerTimer > 0) player.tracerTimer -= dt;
+  for (const e of enemies) {
+    if (e.flashTimer > 0) e.flashTimer -= dt;
+    if (e.tracerTimer > 0) e.tracerTimer -= dt;
+  }
 }
 
 function reloadWeapon() {
@@ -476,7 +496,10 @@ function damageCar(car, dmg) {
 }
 
 function damagePlayer(dmg, fromX, fromZ) {
-  player.hp -= dmg;
+  // Armour absorbs damage first, then health.
+  const absorbed = Math.min(player.armor, dmg);
+  player.armor -= absorbed;
+  player.hp -= (dmg - absorbed);
   G.lastDamageT = G.gameTime;
   if (player.hp <= 0) {
     player.hp = 0;
@@ -518,6 +541,7 @@ function failActiveMission() {
 
 function respawnPlayer() {
   player.hp = 100;
+  player.armor = 50;
   player.x = POI.safehouse.x;
   player.z = POI.safehouse.z + 10;
   player.yaw = 0;
@@ -758,6 +782,14 @@ function updateEnemies(dt) {
           if (player.inCar && player.car) damageCar(player.car, e.kind === 'cop' ? 4 : 7);
           else damagePlayer(e.kind === 'cop' ? 4 : 7, e.x, e.z);
         }
+        // Return fire is visible: a muzzle flash + a tracer streaking at
+        // the player, so a gunfight reads as a gunfight.
+        const em = muzzlePos(e.x, 0, e.z, e.yaw, 0.6);
+        e.flashAt = em;
+        e.flashTimer = 0.06;
+        e.tracerFrom = em;
+        e.tracerTo = [player.x, 1.2, player.z];
+        e.tracerTimer = 0.06;
         sfxShoot(e.weapon);
       }
     }
@@ -902,7 +934,8 @@ function beginStage() {
   } else if (stage.type === 'choice') {
     G.mode = 'choice';
     exitPointerLock();
-    showChoices(stage, (idx) => {
+    const giver = missions().active ? missions().active.mission.giver : null;
+    showChoices(stage, giver, (idx) => {
       const opt = applyChoice(missions(), stage.id, idx, profile());
       hideChoices();
       G.mode = 'play';
@@ -1021,6 +1054,7 @@ function doInteract() {
     openShop(t.type);
   } else if (t.type === 'safehouse') {
     player.hp = 100;
+    player.armor = 50;
     saveGame(G.state);
     toast('Game saved. Theo feels rested.');
     sfxCash();
@@ -1176,6 +1210,13 @@ function updateWeather(dt) {
 // ============================================================================
 // HUD view model
 // ============================================================================
+// "2h 14m" / "14m" for the pause top bar.
+function formatPlayTime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+}
+
 function hudView() {
   const ms = missions();
   const stage = currentStage(ms);
@@ -1248,6 +1289,9 @@ function hudView() {
     carName: player.inCar && player.car ? CAR_MODELS[player.car.model].name : '',
     carHp: player.inCar && player.car ? player.car.hp : 100,
     health: player.hp,
+    armor: player.armor,
+    enemies: enemies.filter((e) => !e.dead).map((e) => ({ x: e.x, z: e.z, kind: e.kind })),
+    playTime: formatPlayTime(G.gameTime),
     aiming: player.aiming > 0.3 && !player.inCar,
     interact: G.interactTarget ? G.interactTarget.label : null,
     hint,
@@ -1260,12 +1304,15 @@ function hudView() {
 function updateCamera(dt) {
   const cam = G.camera;
   if (G.mode === 'title') {
-    // Slow orbit over the bay, Ferris wheel in frame.
+    // Slow drift along the sand at the west end of the beachfront,
+    // looking east: the billboard FACES, the Wheel, palms, umbrellas
+    // and the skyline read behind the menu. (Looking west showed the
+    // boards' black backs.)
     const t = G.time * 0.05;
-    camPos[0] = 80 + Math.cos(t) * 55;
-    camPos[1] = 26;
-    camPos[2] = 112 + Math.sin(t) * 55;
-    return { target: [40, 4, 60], fov: 55 };
+    camPos[0] = 14 + Math.sin(t) * 8;
+    camPos[1] = 3.2 + Math.sin(t * 0.6) * 0.4;
+    camPos[2] = 116 + Math.sin(t * 0.8) * 2;
+    return { target: [70, 3.5, 106], fov: 60 };
   }
   if (player.inCar && player.car) {
     const car = player.car;
@@ -1359,6 +1406,19 @@ function renderFrame(t) {
   const vp = m4.multiply(proj, view);
   const invVP = m4.invert(vp);
   const IDENT = m4.identity();
+  // One tracer streak, shared by the player and every enemy: a unit box
+  // stretched from muzzle to target.
+  const drawTracer = (from, to) => {
+    const len = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+    const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2];
+    const yaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
+    const pitch = Math.asin((to[1] - from[1]) / Math.max(len, 0.01));
+    const trM = m4.multiply(
+      frame(mid[0], mid[1], mid[2], yaw, -pitch, 0, 1),
+      m4.scaleXYZ(len, 1, 1),
+    );
+    drawLit(tracerMesh, trM, m4.multiply(vp, trM), t, 0.8, true);
+  };
 
   beginFrame();
   drawSky(invVP);
@@ -1436,16 +1496,7 @@ function renderFrame(t) {
       drawLit(flashMesh, fm, m4.multiply(vp, fm), t, 1, true);
     }
     if (player.tracerTimer > 0 && player.tracerFrom && player.tracerTo) {
-      const from = player.tracerFrom, to = player.tracerTo;
-      const len = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
-      const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2];
-      const yaw = Math.atan2(-(to[2] - from[2]), to[0] - from[0]);
-      const pitch = Math.asin((to[1] - from[1]) / Math.max(len, 0.01));
-      const trM = m4.multiply(
-        frame(mid[0], mid[1], mid[2], yaw, -pitch, 0, 1),
-        m4.scaleXYZ(len, 1, 1),
-      );
-      drawLit(tracerMesh, trM, m4.multiply(vp, trM), t, 0.8, true);
+      drawTracer(player.tracerFrom, player.tracerTo);
     }
   }
 
@@ -1473,6 +1524,21 @@ function renderFrame(t) {
     const chM = frame(e.x, 0.02, e.z, e.yaw, 0, -fall * (Math.PI / 2), 1);
     drawLit(mesh, chM, m4.multiply(vp, chM), t, 1);
     if (!e.dead) drawBlob(charBlobMesh, m4.multiply(vp, frame(e.x, 0.05, e.z, 0, 0, 0, 1)), [0.05, 0.03, 0.02, 0.3]);
+    if (e.dead) continue;
+    // Hostile marker: a red arrow floating above the head, bobbing and
+    // gently pulsing so hostiles read instantly.
+    const bob = Math.sin(t * 3 + e.x * 0.7 + e.z) * 0.12;
+    const pulse = 1 + Math.sin(t * 3 + e.x) * 0.08;
+    const mkM = frame(e.x, 2.45 + bob, e.z, 0, 0, 0, pulse);
+    drawLit(markerMesh, mkM, m4.multiply(vp, mkM), t, 1);
+    // Enemy muzzle flash + return-fire tracer.
+    if (e.flashTimer > 0 && e.flashAt) {
+      const fm = frame(e.flashAt[0], e.flashAt[1], e.flashAt[2], e.yaw, 0, 0, 1);
+      drawLit(flashMesh, fm, m4.multiply(vp, fm), t, 1, true);
+    }
+    if (e.tracerTimer > 0 && e.tracerFrom && e.tracerTo) {
+      drawTracer(e.tracerFrom, e.tracerTo);
+    }
   }
 
   // Police helicopter + spotlight.
@@ -1516,7 +1582,29 @@ function update(dt) {
   if (G.mode === 'play' || G.mode === 'choice') G.gameTime += dt;
   updateWeather(dt);
   if (G.rain > 0.05) rebuildRain(dt);
-  if (G.mode === 'title') return;
+  if (G.mode === 'title') {
+    // Main menu: arrows move, Enter selects, Esc closes sub-panels.
+    if (menuPanelOpen()) {
+      if (G.input.hit('Escape') || G.input.hit('Enter')) closeMenuPanels();
+    } else if (G.input.hit('ArrowDown') || G.input.hit('ArrowUp')) {
+      menuMove(G.input.hit('ArrowDown') ? 1 : -1);
+    } else if (G.input.hit('Enter')) {
+      menuSelect();
+    }
+    return;
+  }
+  if (G.mode === 'pause') {
+    // Pause screen: M/Esc resume, Q/E switch tabs.
+    if (G.input.hit('KeyM') || G.input.hit('Escape')) {
+      closePause();
+    } else if (G.input.hit('KeyQ') || G.input.hit('KeyE')) {
+      const tabs = ['map', 'stats', 'story', 'settings'];
+      const dir = G.input.hit('KeyE') ? 1 : -1;
+      const cur = tabs.indexOf(G.pauseTab || 'map');
+      setPauseTab(tabs[(cur + dir + tabs.length) % tabs.length]);
+    }
+    return;
+  }
   if (G.mode === 'choice') {
     // Modal choice: the world freezes; only the 1-3 keys work.
     for (let i = 0; i < 3; i++) {
@@ -1608,9 +1696,16 @@ function update(dt) {
 
 function openPause() {
   G.mode = 'pause';
+  G.pauseTab = 'map';
   exitPointerLock();
-  fillPauseScreen(hudView());
+  fillPauseScreen(hudView(), 'map');
   showScreen('pause-screen');
+  sfxClick();
+}
+
+function setPauseTab(tab) {
+  G.pauseTab = tab;
+  fillPauseScreen(hudView(), tab);
   sfxClick();
 }
 
@@ -1618,6 +1713,41 @@ function closePause() {
   G.mode = 'play';
   showScreen(null);
   sfxClick();
+}
+
+// --- main menu navigation ------------------------------------------------------
+// The four menu buttons; arrows move the .selected highlight, Enter clicks
+// it. Hover syncs the highlight too. While a sub-panel (controls/settings)
+// is open, arrows are suspended and Enter/Esc closes the panel.
+const MENU_BTNS = ['btn-continue', 'btn-new', 'btn-controls', 'btn-settings'];
+let menuSel = 0;
+
+function menuPanelOpen() {
+  const c = document.getElementById('controls-panel');
+  const s = document.getElementById('settings-panel');
+  return (c && c.style.display === 'block') || (s && s.style.display === 'block');
+}
+function closeMenuPanels() {
+  const c = document.getElementById('controls-panel');
+  const s = document.getElementById('settings-panel');
+  if (c) c.style.display = 'none';
+  if (s) s.style.display = 'none';
+  sfxClick();
+}
+function menuMove(dir) {
+  const btns = MENU_BTNS.map((id) => document.getElementById(id)).filter((b) => b && !b.disabled);
+  if (!btns.length) return;
+  const cur = btns.findIndex((b) => b.classList.contains('selected'));
+  const next = cur < 0 ? 0 : (cur + dir + btns.length) % btns.length;
+  btns.forEach((b) => b.classList.remove('selected'));
+  btns[next].classList.add('selected');
+  menuSel = next;
+  sfxClick();
+}
+function menuSelect() {
+  const btns = MENU_BTNS.map((id) => document.getElementById(id)).filter((b) => b && !b.disabled);
+  const sel = document.querySelector('.menu .btn.selected') || btns[menuSel] || btns[0];
+  if (sel) sel.click();
 }
 
 function frameLoop(timeMs) {
@@ -1670,13 +1800,54 @@ function wireScreens() {
     G.state = createGameState();
     player.x = 18; player.z = -52; player.yaw = Math.PI;
     player.hp = 100;
+    player.armor = 50;
     updateMissionBeacon();
     startPlay();
   });
-  $('btn-howto').addEventListener('click', () => {
-    const p = $('howto-panel');
+  $('btn-controls').addEventListener('click', () => {
+    const p = $('controls-panel');
+    const s = $('settings-panel');
+    if (s) s.style.display = 'none';
     p.style.display = p.style.display === 'block' ? 'none' : 'block';
     sfxClick();
+  });
+  $('btn-settings').addEventListener('click', () => {
+    const p = $('settings-panel');
+    const c = $('controls-panel');
+    if (c) c.style.display = 'none';
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    sfxClick();
+  });
+  $('btn-controls-back').addEventListener('click', closeMenuPanels);
+  $('btn-settings-back').addEventListener('click', closeMenuPanels);
+  // Settings: volume slider + mute toggle (both persist and work live).
+  const volSlider = $('volume-slider');
+  const volVal = $('volume-val');
+  const showVol = () => { if (volVal) volVal.textContent = Math.round(getVolume() * 100) + '%'; };
+  if (volSlider) {
+    volSlider.value = String(Math.round(getVolume() * 100));
+    volSlider.addEventListener('input', () => {
+      setVolume(Number(volSlider.value) / 100);
+      showVol();
+    });
+  }
+  showVol();
+  const muteBtn = $('btn-mute');
+  const showMute = () => { if (muteBtn) muteBtn.textContent = isMuted() ? 'SOUND: OFF' : 'SOUND: ON'; };
+  if (muteBtn) muteBtn.addEventListener('click', () => { setMuted(!isMuted()); showMute(); sfxClick(); });
+  showMute();
+  // Menu hover syncs the keyboard highlight.
+  MENU_BTNS.forEach((id) => {
+    const b = $(id);
+    if (!b) return;
+    b.addEventListener('mouseenter', () => {
+      document.querySelectorAll('.menu .btn').forEach((x) => x.classList.remove('selected'));
+      if (!b.disabled) b.classList.add('selected');
+    });
+  });
+  // Pause tabs (click).
+  document.querySelectorAll('.pause-tab').forEach((btn) => {
+    btn.addEventListener('click', () => setPauseTab(btn.dataset.tab));
   });
   $('btn-resume').addEventListener('click', closePause);
   $('btn-title').addEventListener('click', () => {
@@ -1697,7 +1868,7 @@ function wireScreens() {
       saveGame(G.state, slot);
       toast('Saved to slot ' + slot + '.');
       sfxCash();
-      fillPauseScreen(hudView());
+      fillPauseScreen(hudView(), G.pauseTab || 'map');
     });
   });
   $('btn-shop-close').addEventListener('click', closeShop);
@@ -1715,13 +1886,28 @@ function wireScreens() {
     respawnPlayer();
     sfxClick();
   });
-  // Continue button label depends on saves.
+  // Continue button: dimmed with no save; otherwise the save info line
+  // (chapter + mission name, cash, day + time).
   const hasAnySave = hasSave(1) || hasSave(2) || hasSave(3);
-  if (!hasAnySave) $('btn-continue').disabled = true;
-  else {
+  const contSub = $('continue-sub');
+  if (!hasAnySave) {
+    $('btn-continue').disabled = true;
+    if (contSub) contSub.textContent = 'No save yet — start a new game';
+  } else {
     const info = saveSlotInfo(1) || saveSlotInfo(2) || saveSlotInfo(3);
-    if (info) $('btn-continue').textContent = 'CONTINUE — $' + Math.floor(info.cash).toLocaleString('en-US') + ' · ' + info.missions + '/8 MISSIONS';
+    if (info && contSub) {
+      const next = missionById(info.nextId);
+      const hh = String(Math.floor(info.hour)).padStart(2, '0');
+      const mm = String(Math.floor((info.hour % 1) * 60)).padStart(2, '0');
+      contSub.textContent = 'Ch. ' + info.nextId + ' ' + (next ? next.name : '') +
+        ' · $' + Math.floor(info.cash).toLocaleString('en-US') +
+        ' · Day ' + info.day + ', ' + hh + ':' + mm;
+    }
   }
+  // Character portraits on the title screen + the initial menu highlight.
+  fillTitleScreen();
+  const firstBtn = MENU_BTNS.map((id) => $(id)).find((b) => b && !b.disabled);
+  if (firstBtn) firstBtn.classList.add('selected');
 }
 
 // ============================================================================
@@ -1779,11 +1965,12 @@ function shotApi() {
     addCar(model, colorIdx, x, z, yaw, kind) {
       return spawnCar(model, colorIdx, x, z, yaw, kind || 'traffic');
     },
-    addPed(x, z) {
+    addPed(x, z, yaw) {
       const ped = spawnPed(x, z, [[x, z], [x + 6, z + 2]]);
-      ped.yaw = Math.PI / 2;
+      ped.yaw = yaw !== undefined ? yaw : Math.PI / 2;
       return ped;
     },
+    enemies() { return enemies; },
     setPlayerCar(model, colorIdx, x, z, yaw, speed) {
       const car = spawnCar(model, colorIdx, x, z, yaw, 'player');
       car.speed = speed || 0;
@@ -1852,7 +2039,8 @@ function shotApi() {
       const stage = currentStage(missions());
       if (stage && stage.type === 'choice') {
         G.mode = 'choice';
-        showChoices(stage, () => {});
+        const giver = missions().active ? missions().active.mission.giver : null;
+        showChoices(stage, giver, () => {});
       }
     },
     openDialog(speaker, text) {

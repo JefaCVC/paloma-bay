@@ -39,6 +39,15 @@ export function stageShot(G, api, name) {
     api.addPed(28, 105.5);
     api.addPed(39, 94.5);
     api.addPed(16, 105.5);
+    // Beachgoers on the sand + walkers in Rambla Park, facing the road.
+    api.addPed(26, 117, Math.PI / 2);
+    api.addPed(38, 118, Math.PI / 2);
+    api.addPed(60, 118, Math.PI / 2);
+    api.addPed(84, 118, Math.PI / 2);
+    api.addPed(104, 117, Math.PI / 2);
+    api.addPed(36, 84, -Math.PI / 2);
+    api.addPed(46, 80, -Math.PI / 2);
+    api.addPed(40, 70, -Math.PI / 2);
     api.startMissionAt(5, 1);
     // Override the mission's wanted-2 with a full 3-star pursuit.
     G.police.wanted = 3;
@@ -57,10 +66,12 @@ export function stageShot(G, api, name) {
     ];
     G.mode = 'play';
   } else if (name === 'combat') {
-    // Night rain in Ciudad Vieja: Theo on foot with the rifle, thugs closing
-    // in, muzzle flash frozen, and the mission-5 CHOICE dialog open — the
-    // branching proof, visible in one frame.
-    api.setTime(21.6, 1);
+    // Night in Ciudad Vieja (NO rain — the HUD must not say RAIN): Theo
+    // on foot with the rifle, thugs closing in, muzzle flashes + tracers
+    // flying BOTH ways, red arrows over the hostiles, red dots on the
+    // minimap, HP/ARMOR bars under the weapon slots — and the mission-5
+    // CHOICE dialog open at the bottom with Mara's portrait.
+    api.setTime(21.6, 0);
     api.setCash(9870);
     api.setRep(2);
     api.setLoyaltyFavor(58, 52);
@@ -69,6 +80,7 @@ export function stageShot(G, api, name) {
     ms2.nextId = 5;
     api.profile().missionsDone = [1, 2, 3, 4];
     api.setPlayerOnFoot(-60, -50, Math.PI / 2, 'rifle', true);
+    api.player().armor = 50;
     // 3/4 camera angle: Theo's profile + rifle silhouette read against the
     // lit street instead of a dead-behind shot.
     G.camera.yaw = Math.PI / 2 + 0.55;
@@ -85,7 +97,8 @@ export function stageShot(G, api, name) {
       { text: 'PBPD-1: Suspect is on foot near Old Town Road.', t: 0 },
     ];
     api.startMissionAt(5, 3);
-    // Freeze a muzzle flash + tracer into the frame.
+    // Freeze a muzzle flash + tracer into the frame — Theo's shot AND
+    // the enemies' return fire, so the frame reads as a gunfight.
     const p = api.player();
     const muzzle = muzzlePos(p.x, 0, p.z, p.yaw, 0.6);
     p.flashAt = muzzle;
@@ -93,6 +106,16 @@ export function stageShot(G, api, name) {
     p.tracerFrom = muzzle;
     p.tracerTo = [p.x + Math.cos(p.yaw) * 18, 1.2, p.z - Math.sin(p.yaw) * 18];
     p.tracerTimer = 0.06;
+    for (const e of api.enemies()) {
+      e.yaw = -Math.PI / 2; // face Theo (south)
+      e.aiming = 1;
+      const em = muzzlePos(e.x, 0, e.z, e.yaw, 0.6);
+      e.flashAt = em;
+      e.flashTimer = 0.06;
+      e.tracerFrom = em;
+      e.tracerTo = [p.x, 1.2, p.z];
+      e.tracerTimer = 0.06;
+    }
     G.mode = 'choice';
   } else if (name === 'map') {
     // Pause screen over the city: full map with legend, mission list, stats,
@@ -111,13 +134,25 @@ export function stageShot(G, api, name) {
     api.profile().stats.kills = 14;
     api.profile().stats.carsStolen = 5;
     api.profile().stats.distanceDriven = 48200;
+    G.gameTime = 3720; // top bar reads "PLAYED 1h 2m"
     api.startMissionAt(4, 0);
     api.openPause();
   } else if (name === 'ending') {
-    // The reward beat: CLEAN GETAWAY at 100% completion, dusk over the bay.
+    // The reward beat: CLEAN GETAWAY at 100% completion — the crew
+    // celebrating at Mara's Garage (HQ): Theo's coupe parked out front,
+    // ten friends gathered around it. All peds stand SOUTH of the
+    // garage's street wall (z = 38) and inside the chase camera's cone
+    // (axis x = -30, FOV 60): the mid rows split left/right of the
+    // centred stats panel, the front row stands below it.
     api.setTime(18.6, 0);
     api.setLoyaltyFavor(85, 30);
-    api.setPlayerCar('coupe', 0, 0, 172, Math.PI / 2, 0);
+    api.setPlayerCar('coupe', 0, -30, 46, Math.PI / 2, 0);
+    const friends = [
+      [-36, 41], [-34, 40], [-26, 40], [-24, 41],
+      [-35, 44], [-25, 44],
+      [-33, 47], [-31, 47], [-29, 47], [-27, 47],
+    ];
+    for (const [fx, fz] of friends) api.addPed(fx, fz, -Math.PI / 2);
     api.completeAllForEnding('clean');
     api.showEnding('clean');
   }

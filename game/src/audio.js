@@ -9,6 +9,13 @@ let master = null;
 let musicGain = null;
 let sfxGain = null;
 let muted = false;
+// Master volume 0–1, persisted so the settings slider survives reloads.
+const VOLUME_KEY = 'paloma-bay-volume';
+let volume = 0.9;
+try {
+  const saved = parseFloat(localStorage.getItem(VOLUME_KEY));
+  if (!Number.isNaN(saved)) volume = Math.max(0, Math.min(1, saved));
+} catch (e) { /* storage unavailable: keep the default */ }
 
 export const STATIONS = [
   {
@@ -66,7 +73,7 @@ export function initAudio() {
     if (!AC) return false;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.9;
+    master.gain.value = muted ? 0 : volume;
     master.connect(ctx.destination);
     musicGain = ctx.createGain();
     musicGain.gain.value = 0.32;
@@ -106,10 +113,18 @@ export function initAudio() {
 
 export function setMuted(m) {
   muted = m;
-  if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 0.9, ctx.currentTime, 0.05);
+  if (master && ctx) master.gain.setTargetAtTime(m ? 0 : volume, ctx.currentTime, 0.05);
 }
 export function isMuted() {
   return muted;
+}
+export function setVolume(v) {
+  volume = Math.max(0, Math.min(1, v));
+  try { localStorage.setItem(VOLUME_KEY, String(volume)); } catch (e) { /* ignore */ }
+  if (master && ctx && !muted) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05);
+}
+export function getVolume() {
+  return volume;
 }
 
 function noteFreq(root, semis) {

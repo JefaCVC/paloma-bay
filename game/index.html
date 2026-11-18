@@ -90,17 +90,25 @@
   .slot-ammo { font-size: 10px; line-height: 1.2; margin-top: 1px; white-space: nowrap; }
   .slot-key { position: absolute; top: 1px; left: 4px; font-size: 9px; color: var(--muted); }
   .slot.cur .slot-key { color: var(--amber); }
-  /* Big speed: car name + condition bar + huge speed, bottom-right. */
+  /* Round speedometer: dial + needle + digital km/h, bottom-right. */
   #speed-wrap { padding: 8px 12px; display: none; width: 100%; text-align: right; }
   #car-name { font-size: 14px; font-weight: 700; }
   #speed-wrap .meter { height: 6px; margin-top: 4px; }
   #car-cond-bar { background: var(--green); }
-  #speed-row { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
-  #speed { font-size: 44px; font-weight: 900; line-height: 1; }
-  #speed-unit { font-size: 13px; color: var(--muted); letter-spacing: 1px; }
+  #speedo { display: flex; justify-content: flex-end; margin-top: 4px; }
+  #speedo svg { display: block; }
   #hint { font-size: 12px; color: var(--muted); text-align: right; padding: 0 4px; }
-  #health-wrap { width: 100%; height: 10px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; display: none; }
-  #health-bar { height: 100%; background: var(--green); }
+  /* HP + ARMOR bars under the weapon bar, top-right. */
+  #vitals-panel { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .vital-row { display: flex; align-items: center; gap: 8px; }
+  .vital-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; width: 44px; flex: none; }
+  .vital-label.hp { color: #7ddb52; }
+  .vital-label.armor { color: #4da6ff; }
+  .vital-bar { flex: 1; height: 10px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; }
+  .vital-bar > div { height: 100%; }
+  #vitals-hp-bar { background: #7ddb52; }
+  #vitals-armor-bar { background: #4da6ff; }
+  .vital-val { font-size: 12px; font-weight: 700; width: 26px; text-align: right; flex: none; }
 
   /* ---- center overlays ---- */
   #crosshair { position: fixed; left: 50%; top: 50%; width: 28px; height: 28px; transform: translate(-50%, -50%); display: none; z-index: 6; pointer-events: none; }
@@ -116,15 +124,25 @@
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
     width: 640px; max-width: 92vw; background: var(--panel); border: var(--panel-border);
     border-radius: 8px; padding: 12px 16px; display: none; z-index: 7;
+    align-items: flex-start; gap: 12px;
   }
+  #dialog-portrait { flex: none; }
+  #dialog-portrait svg { display: block; border-radius: 8px; }
+  .dialog-body { flex: 1; min-width: 0; }
   #dialog-speaker { font-size: 13px; font-weight: 700; color: var(--amber); letter-spacing: 2px; }
   #dialog-text { font-size: 16px; line-height: 1.45; margin-top: 4px; }
   #dialog .dialog-hint { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: right; }
+  /* Choice dialog: BOTTOM-center, portrait on the left, options right. */
   #choices {
-    position: fixed; left: 50%; top: 12%; transform: translateX(-50%);
-    width: 560px; max-width: 92vw; background: var(--panel); border: 2px solid var(--amber);
-    border-radius: 12px; padding: 20px 24px; display: none; z-index: 8; pointer-events: auto;
+    position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+    width: 680px; max-width: 94vw; background: var(--panel); border: 2px solid var(--amber);
+    border-radius: 12px; padding: 16px 20px; display: none; z-index: 8; pointer-events: auto;
   }
+  .choices-row { display: flex; align-items: flex-start; gap: 16px; }
+  .choices-portrait { flex: none; }
+  .choices-portrait svg { display: block; border-radius: 10px; }
+  .choices-body { flex: 1; min-width: 0; }
+  .choices-giver { font-size: 13px; font-weight: 700; color: var(--amber); letter-spacing: 2px; margin-bottom: 4px; }
   .choices-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; line-height: 1.35; }
   .choice-btn {
     display: block; width: 100%; text-align: left; margin-top: 8px; padding: 10px 14px;
@@ -158,10 +176,47 @@
     background: linear-gradient(180deg, rgba(8, 10, 18, 0.55), rgba(8, 10, 18, 0.82));
     overflow-y: auto; padding: 16px;
   }
-  .logo { font-size: 72px; font-weight: 900; letter-spacing: 10px; color: var(--amber); line-height: 1; }
-  .logo-sub { font-size: 18px; letter-spacing: 4px; color: var(--text); margin-top: 8px; }
-  .tagline { font-size: 15px; color: var(--muted); margin-top: 16px; max-width: 560px; text-align: center; line-height: 1.5; }
-  .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 28px; width: 300px; }
+  /* main menu: logo + menu left, how-to-play right, portraits bottom-right */
+  #title-screen { justify-content: space-between; align-items: stretch; padding: 28px 40px 18px; background: linear-gradient(180deg, rgba(8,10,18,0.30), rgba(8,10,18,0.55)); }
+  #title-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  #title-left { flex: none; }
+  .logo {
+    font-size: 84px; font-weight: 900; letter-spacing: 6px; line-height: 0.95;
+    background: linear-gradient(180deg, #ffe259 0%, #ff7e5f 55%, #ff2e63 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.65));
+  }
+  .logo-sub { font-size: 16px; letter-spacing: 4px; color: var(--text); margin-top: 10px; text-shadow: 0 2px 6px rgba(0,0,0,0.8); }
+  .menu { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; width: 320px; }
+  .menu .btn { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; background: rgba(16,18,26,0.72); }
+  .menu .btn.primary { background: var(--amber); }
+  .menu .btn.primary .menu-sub { color: rgba(20,20,20,0.75); }
+  .menu .btn:disabled { opacity: 0.65; }
+  .menu .btn:disabled .menu-sub { color: rgba(20,20,20,0.9); }
+  .menu .btn.selected { border-color: var(--amber); background: rgba(245,197,66,0.32); box-shadow: -4px 0 0 var(--amber); }
+  .menu-label { font-size: 18px; font-weight: 900; letter-spacing: 2px; }
+  .menu-sub { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+  #title-right { flex: none; width: 340px; }
+  #title-howto { padding: 14px 16px; }
+  #title-howto h3, #controls-panel h3, #settings-panel h3 { margin: 0 0 10px 0; color: var(--amber); font-size: 15px; letter-spacing: 2px; }
+  .howto-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 3px 0; }
+  .howto-row .key { flex: none; min-width: 52px; text-align: center; padding: 2px 6px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; font-weight: 700; font-size: 12px; }
+  #controls-panel, #settings-panel {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 540px; max-width: 92vw; z-index: 30; padding: 20px 24px; display: none;
+  }
+  #controls-panel .btn, #settings-panel .btn { margin-top: 14px; }
+  .set-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 14px; }
+  .set-row > span:first-child { width: 80px; flex: none; font-weight: 700; }
+  .set-row input[type="range"] { flex: 1; }
+  .set-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  #title-bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+  .tagline { font-size: 14px; color: #e8e8e8; max-width: 640px; line-height: 1.5; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+  #title-portraits { display: flex; gap: 10px; flex: none; }
+  .title-char { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .title-char svg { border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+  .title-char span { font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+  #title-hint { text-align: right; font-size: 12px; color: var(--muted); margin-top: 8px; }
   .btn {
     padding: 12px 16px; font-size: 16px; font-weight: 700; font-family: inherit;
     background: rgba(245, 197, 66, 0.14); border: 2px solid var(--amber-dim); border-radius: 8px;
@@ -170,20 +225,50 @@
   .btn:hover { background: rgba(245, 197, 66, 0.32); }
   .btn:disabled { opacity: 0.4; cursor: default; }
   .btn.primary { background: var(--amber); color: #141414; }
-  .controls-grid { display: grid; grid-template-columns: auto auto; gap: 4px 16px; font-size: 13px; margin-top: 20px; color: var(--muted); }
-  .controls-grid b { color: var(--text); font-weight: 600; }
-  #howto-panel { display: none; max-width: 640px; margin-top: 20px; padding: 16px; font-size: 14px; line-height: 1.55; }
-  #howto-panel h3 { margin: 0 0 8px 0; color: var(--amber); }
 
-  /* pause screen: map left, systems right */
+  /* pause screen: top bar + 3 columns + bottom bar */
   #pause-screen { justify-content: flex-start; }
-  .pause-head { font-size: 24px; font-weight: 900; letter-spacing: 6px; color: var(--amber); margin-bottom: 8px; }
-  .pause-row { display: flex; gap: 16px; align-items: flex-start; }
-  #map-wrap { flex: none; }
-  #map-canvas { width: 640px; height: 560px; border: var(--panel-border); border-radius: 8px; background: #1d4a66; display: block; }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--muted); margin-top: 8px; max-width: 640px; }
+  #pause-topbar { display: flex; align-items: center; gap: 16px; width: 100%; max-width: 1220px; margin-bottom: 10px; }
+  .pause-brand { font-size: 20px; font-weight: 900; letter-spacing: 4px; color: var(--amber); flex: none; }
+  .pause-paused { font-size: 13px; font-weight: 700; letter-spacing: 3px; color: #fff; background: rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 4px; flex: none; }
+  #pause-clock { font-size: 13px; color: var(--muted); flex: none; white-space: nowrap; }
+  .pause-tabs { display: flex; gap: 6px; flex: 1; justify-content: center; }
+  .pause-tab { padding: 6px 14px; font-size: 13px; font-weight: 700; font-family: inherit; letter-spacing: 1px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: var(--muted); cursor: pointer; }
+  .pause-tab.active { background: rgba(245,197,66,0.25); border-color: var(--amber); color: var(--text); }
+  #pause-complete { display: flex; align-items: center; gap: 8px; flex: none; width: 210px; }
+  #pause-complete .meter { flex: 1; height: 8px; }
+  #pause-complete-bar { background: var(--green); }
+  #pause-complete-val { font-size: 12px; font-weight: 700; color: var(--green); white-space: nowrap; }
+  .pause-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 1220px; }
+  #pause-left, #pause-right { width: 250px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+  #pause-center { flex: 1; min-width: 0; }
+  #map-canvas { width: 640px; height: 560px; border: var(--panel-border); border-radius: 8px; background: #1d4a66; display: block; max-width: 100%; }
+  .pause-center-panel { width: 640px; max-width: 100%; height: 560px; overflow-y: auto; padding: 14px 16px; }
+  .pause-center-panel h4 { margin: 0 0 8px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
+  .pause-center-panel h4:not(:first-child) { margin-top: 16px; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 12px; color: var(--muted); }
   .legend b { color: var(--text); }
-  #pause-side { width: 300px; display: flex; flex-direction: column; gap: 8px; }
+  .ptile { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; gap: 8px; }
+  .ptile-k { color: var(--muted); letter-spacing: 1px; }
+  .ptile-v { font-weight: 700; text-align: right; }
+  .job-name { font-size: 15px; font-weight: 700; color: var(--amber); }
+  .job-obj { font-size: 13px; line-height: 1.4; margin: 4px 0 6px 0; }
+  .crew-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+  .crew-row svg { border-radius: 6px; flex: none; }
+  .crew-name { font-size: 13px; font-weight: 700; }
+  .crew-role { font-size: 11px; color: var(--muted); }
+  .story-row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .story-row svg { border-radius: 8px; flex: none; }
+  .story-row.locked { opacity: 0.45; }
+  .story-main { flex: 1; min-width: 0; }
+  .story-name { font-size: 14px; font-weight: 700; }
+  .story-brief { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+  .story-meta { font-size: 11px; color: var(--amber); margin-top: 3px; }
+  .story-status { font-size: 11px; font-weight: 700; letter-spacing: 1px; flex: none; }
+  .story-row.done .story-status { color: var(--green); }
+  .story-row.open .story-status { color: var(--amber); }
+  #pause-bottombar { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1220px; margin-top: 10px; }
+  .pause-hints { font-size: 12px; color: var(--muted); }
   .side-block { padding: 8px 12px; }
   .side-block h4 { margin: 0 0 6px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
   .prow { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; gap: 8px; }
@@ -204,10 +289,10 @@
   .shop-btn { flex: none; padding: 8px 14px; font-size: 14px; font-weight: 700; font-family: inherit; background: rgba(245,197,66,0.14); border: 2px solid var(--amber-dim); border-radius: 8px; color: var(--text); cursor: pointer; min-width: 110px; }
   .shop-btn:hover:not(:disabled) { background: rgba(245,197,66,0.32); }
   .shop-btn:disabled { opacity: 0.4; cursor: default; }
-  #ending-screen { --ending-accent: #f5c542; }
-  #ending-name { font-size: 56px; font-weight: 900; letter-spacing: 8px; color: var(--ending-accent); text-align: center; line-height: 1.05; }
-  #ending-title { font-size: 20px; margin-top: 12px; text-align: center; }
-  #ending-desc { font-size: 16px; color: var(--muted); margin-top: 12px; max-width: 600px; text-align: center; line-height: 1.55; }
+  #ending-screen { --ending-accent: #f5c542; background: linear-gradient(180deg, rgba(8,10,18,0.25), rgba(8,10,18,0.45)); justify-content: flex-start; padding-top: 36px; }
+  #ending-name { font-size: 56px; font-weight: 900; letter-spacing: 8px; color: var(--ending-accent); text-align: center; line-height: 1.05; text-shadow: 0 2px 10px rgba(0,0,0,0.85); }
+  #ending-title { font-size: 20px; margin-top: 12px; text-align: center; text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
+  #ending-desc { font-size: 16px; color: var(--muted); margin-top: 12px; max-width: 600px; text-align: center; line-height: 1.55; text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
   #ending-stats { width: 420px; max-width: 92vw; margin-top: 20px; padding: 12px 16px; }
   #dead-title { font-size: 72px; font-weight: 900; letter-spacing: 10px; color: var(--red); }
   #dead-sub { font-size: 16px; color: var(--muted); margin-top: 12px; max-width: 520px; text-align: center; line-height: 1.5; }
@@ -244,6 +329,10 @@
       <div id="weapon-name">PB-9 Pistol</div>
       <div id="weapon-slots"></div>
     </div>
+    <div class="panel" id="vitals-panel">
+      <div class="vital-row"><span class="vital-label hp">HP</span><div class="vital-bar"><div id="vitals-hp-bar" style="width:100%"></div></div><span class="vital-val" id="vitals-hp-val">100</span></div>
+      <div class="vital-row"><span class="vital-label armor">ARMOR</span><div class="vital-bar"><div id="vitals-armor-bar" style="width:50%"></div></div><span class="vital-val" id="vitals-armor-val">50</span></div>
+    </div>
   </div>
   <div class="corner" id="corner-bl">
     <canvas id="minimap" width="180" height="180"></canvas>
@@ -255,23 +344,52 @@
     </div>
   </div>
   <div class="corner" id="corner-br">
-    <div id="health-wrap"><div id="health-bar" style="width:100%"></div></div>
     <div class="panel" id="radio-box">
       <div id="radio">Radio Paloma 88.5</div>
     </div>
     <div class="panel" id="speed-wrap">
       <div id="car-name">Falco GT</div>
       <div class="meter"><div id="car-cond-bar" style="width:100%"></div></div>
-      <div id="speed-row"><span id="speed" class="outline">0</span><span id="speed-unit">KM/H</span></div>
+      <div id="speedo">
+        <svg viewBox="0 0 140 140" width="140" height="140" aria-hidden="true">
+          <circle cx="70" cy="70" r="66" fill="rgba(10,12,20,0.72)" stroke="rgba(245,197,66,0.5)" stroke-width="2"/>
+          <path d="M123.3 52.7 A56 56 0 0 1 118.5 98" fill="none" stroke="#ff3b30" stroke-width="4" stroke-linecap="round"/>
+          <g stroke="#ffffff" stroke-width="2" stroke-linecap="round">
+            <line x1="25" y1="96" x2="18" y2="100"/>
+            <line x1="18.3" y1="75.5" x2="10.3" y2="76.3"/>
+            <line x1="20.5" y1="53.9" x2="12.9" y2="51.5"/>
+            <line x1="31.4" y1="35.2" x2="25.4" y2="29.9"/>
+            <line x1="48.8" y1="22.5" x2="45.6" y2="15.2"/>
+            <line x1="70" y1="18" x2="70" y2="10"/>
+            <line x1="91.2" y1="22.5" x2="94.4" y2="15.2"/>
+            <line x1="108.6" y1="35.2" x2="114.6" y2="29.9"/>
+            <line x1="119.5" y1="53.9" x2="127.1" y2="51.5"/>
+            <line x1="121.7" y1="75.5" x2="129.7" y2="76.3"/>
+            <line x1="115" y1="96" x2="122" y2="100"/>
+          </g>
+          <text x="28" y="112" text-anchor="middle" font-size="11" fill="#aaaaaa" font-family="Arial, sans-serif">0</text>
+          <text x="70" y="32" text-anchor="middle" font-size="11" fill="#aaaaaa" font-family="Arial, sans-serif">100</text>
+          <text x="112" y="112" text-anchor="middle" font-size="11" fill="#aaaaaa" font-family="Arial, sans-serif">200</text>
+          <g id="speedo-needle" transform="rotate(-120 70 70)">
+            <line x1="70" y1="70" x2="70" y2="18" stroke="#ff3b30" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="70" cy="70" r="6" fill="#ff3b30"/>
+          </g>
+          <text id="speedo-num" x="70" y="96" text-anchor="middle" font-size="30" font-weight="900" fill="#ffffff" font-family="Arial, sans-serif">0</text>
+          <text x="70" y="110" text-anchor="middle" font-size="10" fill="#aaaaaa" font-family="Arial, sans-serif">KM/H</text>
+        </svg>
+      </div>
     </div>
     <div id="hint" class="outline"></div>
   </div>
   <div id="crosshair"></div>
   <div id="interact">Press E</div>
   <div id="dialog">
-    <div id="dialog-speaker">ZED OKAFOR</div>
-    <div id="dialog-text"></div>
-    <div class="dialog-hint">Press E or click to continue</div>
+    <div id="dialog-portrait"></div>
+    <div class="dialog-body">
+      <div id="dialog-speaker">ZED OKAFOR</div>
+      <div id="dialog-text"></div>
+      <div class="dialog-hint">Press E or click to continue</div>
+    </div>
   </div>
   <div id="choices"></div>
   <div id="banner"><div id="banner-title" class="outline"></div><div id="banner-sub" class="outline"></div></div>
@@ -279,62 +397,118 @@
 </div>
 
 <div class="screen" id="title-screen">
-  <div class="logo outline">PALOMA BAY</div>
-  <div class="logo-sub outline">A SUN-SOAKED CRIME STORY</div>
-  <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Eight missions. Three choices. Three endings.</div>
-  <div class="menu">
-    <button class="btn primary" id="btn-continue">CONTINUE</button>
-    <button class="btn" id="btn-new">NEW GAME</button>
-    <button class="btn" id="btn-howto">HOW TO PLAY</button>
+  <div id="title-main">
+    <div id="title-left">
+      <div class="logo">PALOMA<br>BAY</div>
+      <div class="logo-sub outline">A SUN-SOAKED CRIME STORY</div>
+      <div class="menu">
+        <button class="btn primary" id="btn-continue"><span class="menu-label">CONTINUE</span><span class="menu-sub" id="continue-sub"></span></button>
+        <button class="btn" id="btn-new"><span class="menu-label">NEW GAME</span></button>
+        <button class="btn" id="btn-controls"><span class="menu-label">CONTROLS</span></button>
+        <button class="btn" id="btn-settings"><span class="menu-label">SETTINGS</span></button>
+      </div>
+    </div>
+    <div id="title-right">
+      <div class="panel" id="title-howto">
+        <h3>HOW TO PLAY</h3>
+        <div class="howto-row"><span class="key">WASD</span><span>Walk / drive</span></div>
+        <div class="howto-row"><span class="key">Mouse</span><span>Aim · Click to shoot</span></div>
+        <div class="howto-row"><span class="key">Shift</span><span>Nitro (with upgrade)</span></div>
+        <div class="howto-row"><span class="key">Space</span><span>Handbrake</span></div>
+        <div class="howto-row"><span class="key">E</span><span>Enter car / interact</span></div>
+        <div class="howto-row"><span class="key">R</span><span>Reload</span></div>
+        <div class="howto-row"><span class="key">1–5</span><span>Weapons</span></div>
+        <div class="howto-row"><span class="key">M / Esc</span><span>City map / pause</span></div>
+      </div>
+    </div>
   </div>
-  <div class="panel" id="howto-panel">
-    <h3>HOW TO PLAY</h3>
-    <b>Drive:</b> WASD to drive, SPACE handbrake, SHIFT nitro (with the upgrade), E enter / exit car, H horn.<br>
-    <b>On foot:</b> WASD to move, mouse to aim (click to lock the mouse), LEFT CLICK shoot, RIGHT CLICK aim, 1–5 or wheel to switch weapons, R reload.<br>
-    <b>World:</b> E interacts — start missions, buy guns, upgrade the car, save at the safehouse. M opens the map. Z calls Mara for a free repair. X lets Zed fence your car for cash. N changes radio station.<br>
-    <b>Police:</b> stars rise when you are seen committing crimes. Break line of sight to lose them — or respray at Mara's Garage to clear your wanted level.<br>
-    <b>Choices:</b> three story choices move your LOYALTY and FAVOR. They decide your ending: Clean Getaway, King of the Bay, or Burn It All.
+  <div class="panel" id="controls-panel">
+    <h3>CONTROLS</h3>
+    <div class="howto-row"><span class="key">WASD</span><span>Walk / drive</span></div>
+    <div class="howto-row"><span class="key">Mouse</span><span>Aim &amp; camera · Click to lock, Left click shoots, Right click aims</span></div>
+    <div class="howto-row"><span class="key">Shift</span><span>Nitro boost (needs the Nitro upgrade)</span></div>
+    <div class="howto-row"><span class="key">Space</span><span>Handbrake</span></div>
+    <div class="howto-row"><span class="key">E</span><span>Enter / exit car · Interact · Advance dialog</span></div>
+    <div class="howto-row"><span class="key">H</span><span>Horn</span></div>
+    <div class="howto-row"><span class="key">R</span><span>Reload weapon</span></div>
+    <div class="howto-row"><span class="key">1–5 / wheel</span><span>Switch weapons</span></div>
+    <div class="howto-row"><span class="key">Z</span><span>Mara: free car repair</span></div>
+    <div class="howto-row"><span class="key">X</span><span>Zed: fence your car for cash</span></div>
+    <div class="howto-row"><span class="key">N</span><span>Next radio station</span></div>
+    <div class="howto-row"><span class="key">M / Esc</span><span>City map &amp; pause · Q / E switch pause tabs</span></div>
+    <button class="btn" id="btn-controls-back">BACK</button>
   </div>
-  <div class="controls-grid">
-    <span><b>WASD</b> move / drive</span><span><b>Mouse</b> aim &amp; camera</span>
-    <span><b>E</b> enter car / interact</span><span><b>1–5 / wheel</b> weapons</span>
-    <span><b>M</b> map &amp; pause</span><span><b>R</b> reload</span>
-    <span><b>Z</b> Mara: free repair</span><span><b>X</b> Zed: fence car</span>
-    <span><b>N</b> radio station</span><span><b>SPACE</b> handbrake</span>
+  <div class="panel" id="settings-panel">
+    <h3>SETTINGS</h3>
+    <div class="set-row"><span>Volume</span><input type="range" id="volume-slider" min="0" max="100" value="90"><span id="volume-val">90%</span></div>
+    <div class="set-row"><span>Sound</span><button class="btn" id="btn-mute">SOUND: ON</button></div>
+    <div class="set-note">Volume and sound apply immediately and are saved for next time.</div>
+    <button class="btn" id="btn-settings-back">BACK</button>
   </div>
+  <div id="title-bottom">
+    <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Eight missions. Three choices. Three endings.</div>
+    <div id="title-portraits"></div>
+  </div>
+  <div id="title-hint">Enter to select · arrows to move</div>
 </div>
 
 <div class="screen" id="pause-screen">
-  <div class="pause-head outline">PALOMA BAY</div>
-  <div class="pause-row">
-    <div id="map-wrap">
-      <canvas id="map-canvas" width="640" height="560"></canvas>
-      <div class="legend">
-        <span><b style="color:#ffd23e">◆</b> Mission</span>
-        <span><b style="color:#4da6ff">●</b> Mara's Garage</span>
-        <span><b style="color:#ff6b4a">●</b> Iron &amp; Oak Guns</span>
-        <span><b style="color:#7ddb52">●</b> Safehouse</span>
-        <span><b style="color:#c07df0">●</b> Zed's Pawn</span>
-        <span><b style="color:#f5c542">●</b> Bay Postcard</span>
-        <span><b style="color:#4a90ff">●</b> PBPD unit</span>
-        <span><b style="color:#fff">▲</b> You</span>
-      </div>
+  <div id="pause-topbar">
+    <div class="pause-brand outline">PALOMA BAY</div>
+    <div class="pause-paused">PAUSED</div>
+    <div id="pause-clock">DAY 1 · 18:12 · PLAYED 0m</div>
+    <div class="pause-tabs">
+      <button class="pause-tab active" data-tab="map">MAP</button>
+      <button class="pause-tab" data-tab="stats">STATS</button>
+      <button class="pause-tab" data-tab="story">STORY</button>
+      <button class="pause-tab" data-tab="settings">SETTINGS</button>
     </div>
-    <div id="pause-side">
-      <div class="panel side-block"><h4>MISSIONS</h4><div id="pause-missions"></div></div>
-      <div class="panel side-block"><h4>STATS</h4><div id="pause-stats"></div></div>
-      <div class="panel side-block"><h4>GARAGE — MARA'S</h4><div id="pause-garage"></div></div>
+    <div id="pause-complete"><div class="meter"><div id="pause-complete-bar" style="width:0%"></div></div><span id="pause-complete-val">0% COMPLETE</span></div>
+  </div>
+  <div class="pause-row">
+    <div id="pause-left">
+      <div class="panel side-block"><h4>PROGRESS</h4><div id="pause-progress"></div></div>
+      <div class="panel side-block"><h4>CURRENT JOB</h4><div id="pause-job"></div></div>
       <div class="panel side-block"><h4>SAVE GAME</h4><div class="pause-btns" id="pause-saves">
         <button class="btn" data-slot="1">SLOT 1</button>
         <button class="btn" data-slot="2">SLOT 2</button>
         <button class="btn" data-slot="3">SLOT 3</button>
       </div></div>
-      <div class="pause-btns">
-        <button class="btn primary" id="btn-resume">RESUME</button>
-        <button class="btn" id="btn-sound">SOUND: ON</button>
-        <button class="btn" id="btn-title">TITLE SCREEN</button>
-      </div>
     </div>
+    <div id="pause-center">
+      <div id="pause-center-map"><canvas id="map-canvas" width="640" height="560"></canvas></div>
+      <div id="pause-center-stats" class="panel pause-center-panel" style="display:none"><div id="pause-stats-body"></div></div>
+      <div id="pause-center-story" class="panel pause-center-panel" style="display:none"><div id="pause-story-body"></div></div>
+      <div id="pause-center-settings" class="panel pause-center-panel" style="display:none"><div id="pause-settings-body"></div></div>
+    </div>
+    <div id="pause-right">
+      <div class="panel side-block"><h4>LEGEND</h4><div class="legend">
+        <span><b style="color:#ffd23e">◆</b> Mission</span>
+        <span><b style="color:#4da6ff">G</b> Mara's Garage</span>
+        <span><b style="color:#ff6b4a">A</b> Iron &amp; Oak Guns</span>
+        <span><b style="color:#7ddb52">H</b> Safehouse</span>
+        <span><b style="color:#c07df0">P</b> Zed's Pawn</span>
+        <span><b style="color:#a04ae0">V</b> Vireo HQ</span>
+        <span><b style="color:#ff9ad5">W</b> Paloma Wheel</span>
+        <span><b style="color:#fff">L</b> Lighthouse</span>
+        <span><b style="color:#c89a5a">D</b> Pier</span>
+        <span><b style="color:#f5c542">●</b> Bay Postcard</span>
+        <span><b style="color:#4a90ff">●</b> PBPD unit</span>
+        <span><b style="color:#ff2a2a">●</b> Hostile</span>
+        <span><b style="color:#2e6b2e">■</b> Rambla Park</span>
+        <span><b style="color:#ffd23e">┄</b> GPS route</span>
+        <span><b style="color:#fff">▲</b> You</span>
+      </div></div>
+      <div class="panel side-block"><h4>CREW</h4><div id="pause-crew"></div></div>
+    </div>
+  </div>
+  <div id="pause-bottombar">
+    <div class="pause-btns">
+      <button class="btn primary" id="btn-resume">RESUME</button>
+      <button class="btn" id="btn-sound">SOUND: ON</button>
+      <button class="btn" id="btn-title">TITLE SCREEN</button>
+    </div>
+    <div class="pause-hints">M / Esc resume · Q / E switch tab · Click a tab</div>
   </div>
 </div>
 

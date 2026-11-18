@@ -104,6 +104,9 @@ export function saveSlotInfo(slot) {
       cash: data.profile.cash,
       rep: data.profile.rep,
       missions: (data.missions.done || []).length,
+      nextId: data.missions.nextId || 1,
+      day: data.profile.day || 1,
+      hour: data.profile.hour || 18.2,
       savedAt: data.savedAt,
     };
   } catch (e) {
