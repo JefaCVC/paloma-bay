@@ -18,6 +18,8 @@ import { POI } from './world.js';
 //   choice   — pick one option; consequences apply at once
 //   deliver  — reach a marker carrying something (same as driveTo, new label)
 //   escape   — reach the marker while wanted (finales)
+// A stage may also set `timer` (seconds): a soft display countdown in the
+// mission panel. It expires at 00:00 and never fails the mission.
 export const MISSIONS = [
   {
     id: 1, name: 'Night Shift', giver: 'Zed Okafor', district: 'Barrio Sol',
@@ -67,7 +69,7 @@ export const MISSIONS = [
     stages: [
       { type: 'driveTo', x: POI.pier.x + 8, z: POI.pier.z, text: 'Pick up the cargo at the pier', next: 'The roads are watched — take the water' },
       { type: 'driveTo', x: 24, z: 140, text: 'Drive to the beach — a jet ski waits at the waterline', next: 'Ride the jet ski across the bay' },
-      { type: 'driveTo', x: 60, z: 168, text: 'Ride the jet ski to the rendezvous — the PBPD cannot follow on water', next: 'Deliver to Zed' },
+      { type: 'driveTo', x: 60, z: 168, timer: 163, text: 'Ride the jet ski to the rendezvous — the PBPD cannot follow on water', next: 'Deliver to Zed' },
       { type: 'driveTo', x: POI.pawn.x, z: POI.pawn.z + 8, text: "Deliver the cargo to Zed's Pawn", next: 'Mission complete' },
     ],
   },
@@ -133,7 +135,7 @@ export const MISSIONS = [
     stages: [
       { type: 'dialog', speaker: 'MARA MARCHETTI', text: "Theo — the PBPD set up a dragnet on the strip. New task force, three cars and a heli, and they want the Falco back. Don't stop. Don't get boxed in. Lose them, then get to the safehouse.", next: 'Outrun the PBPD' },
       {
-        type: 'chase', wanted: 3, text: 'Outrun the PBPD — break line of sight', next: 'Reach the safehouse',
+        type: 'chase', wanted: 3, timer: 126, text: 'Outrun the PBPD — break line of sight', next: 'Reach the safehouse',
         chatter: [
           "Mara: Don't get boxed in — the causeway is clear.",
           'Zed: Three cars and a heli, Theo. Stay on the beachfront.',

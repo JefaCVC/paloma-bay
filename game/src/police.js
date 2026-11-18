@@ -142,9 +142,14 @@ export function updatePolice(police, dt, gameTime, player, onChatter) {
     }
   }
   // Unit distances + states (positions are driven by game.js).
+  // Staged units (u.hold) keep their assigned state — FLIPPED and
+  // ROADBLOCK cars are parked by staging and never re-assigned here.
   for (const u of police.units) {
     u.dist = Math.round(v3.dist2([u.x, 0, u.z], [player.x, 0, player.z]));
+    if (u.hold) continue;
     if (police.wanted >= 4 && u.dist < 12) u.state = 'RAMMING';
+    else if (police.wanted >= 4 && u.dist < 25) u.state = 'BOXING IN';
+    else if (u.dist > 120) u.state = 'EN ROUTE';
     else if (seen) u.state = u.dist < 25 ? 'PURSUING' : 'RESPONDING';
     else u.state = 'SEARCHING';
   }

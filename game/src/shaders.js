@@ -186,9 +186,16 @@ void main() {
   float h = clamp(dir.y, 0.0, 1.0);
   vec3 col = mix(uHorizon, uZenith, pow(h, 0.55));
   float s = max(dot(dir, normalize(uSunDir)), 0.0);
-  col += uSunColor * pow(s, 600.0) * 3.0;  // sun disc
-  col += uSunColor * pow(s, 24.0) * 0.55;  // halo
-  col += uSunColor * pow(s, 5.0) * 0.18;   // wide glow
+  // Sun disc: a CRISP big disc (smoothstep edge, ~5-6 deg radius) in a
+  // white-hot colour, so it reads as a sun against the orange halo
+  // instead of melting into it (a pow-only disc ACES-compresses into the
+  // halo and vanishes). The soft pow rim + dimmed halo/glow keep the
+  // sunset glow without swallowing the disc.
+  float disc = smoothstep(0.9945, 0.9965, s);
+  col += mix(uSunColor, vec3(1.0, 0.98, 0.92), 0.55) * disc * 4.0;
+  col += uSunColor * pow(s, 150.0) * 1.2;  // soft rim around the disc
+  col += uSunColor * pow(s, 24.0) * 0.30;  // halo (dimmed so the disc pops)
+  col += uSunColor * pow(s, 5.0) * 0.12;   // wide glow (dimmed)
   col = mix(vec3(0.55, 0.42, 0.34), col, smoothstep(-0.08, 0.02, dir.y));
   col = aces(col);
   vec2 q = gl_FragCoord.xy / uResolution;

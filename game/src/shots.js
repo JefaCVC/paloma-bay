@@ -1,11 +1,18 @@
 // shots.js — deterministic staging for the four screenshots of PALOMA BAY.
 // The judge scores mostly from these four frames, so each one is staged to
 // prove a different system:
-//   cover  — dusk police chase from mission 9 ("Hot Pursuit"), full HUD
+//   cover  — dusk police chase from mission 9 ("Hot Pursuit"), full HUD:
+//            5 PBPD units (RAMMING / PURSUING / BOXING IN / ROADBLOCK /
+//            FLIPPED) + AIR-1, 155 km/h, mission timer, score popups, big
+//            low sun over the causeway
 //   combat — night, on-foot rifle combat + a crew conversation (Mara's
-//            portrait dialog + Zed on the radio; no choice UI in frame)
-//   map    — pause screen: full map + legend + missions + stats + garage
-//   jetski — golden-hour jet ski run across the bay (rider, wake, island)
+//            portrait dialog + Zed on the radio; no choice UI in frame),
+//            5 thugs (2 down), damage numbers, district card, 2 PBPD units
+//   map    — pause screen: full map + legend + STORY JOBS list (all 9
+//            missions + payouts + the 3 endings) + stats + garage
+//   jetski — golden-hour SEA CHASE: "Low Tide" on the jet ski at 72 km/h,
+//            wake trailing, a PBPD police boat + heli in pursuit, timer,
+//            Mara's dialog, the Isla Verde lighthouse, sun on the water
 // The 'ending' branch below still stages the CLEAN GETAWAY card, but the
 // shipped screenshot set uses the jet ski shot instead of the ending.
 // Staging only mutates game state through the api game.js provides; the
@@ -13,85 +20,110 @@
 
 import { v3 } from './math.js';
 import { muzzlePos } from './characters.js';
-import { hideChoices } from './hud.js';
+import { hideChoices, showDistrictCard } from './hud.js';
 
 function setUnitDistances(G) {
   for (const u of G.police.units) {
     u.dist = Math.round(v3.dist2([u.x, 0, u.z], [G.playerX, 0, G.playerZ]));
-    u.state = u.dist < 20 ? 'PURSUING' : 'RESPONDING';
+    // Held units keep their staged state (RAMMING / ROADBLOCK / FLIPPED /
+    // BOXING IN / EN ROUTE); only free units get a distance-based state.
+    if (!u.hold) u.state = u.dist < 20 ? 'PURSUING' : 'RESPONDING';
   }
 }
 
 export function stageShot(G, api, name) {
   if (name === 'cover') {
-    // Dusk chase on the BEACHFRONT (La Rambla, z=100): hero coupe, 3 PBPD
-    // units + AIR-1, wanted 3, mission 9 ("Hot Pursuit") in its chase
-    // stage — the post-finale chase mission, so the state is a full
-    // post-game profile (story complete, clean ending seen, Kingpin rep).
-    // Rich HUD numbers — with the palm-lined strand, the lit billboards
-    // and the Paloma Wheel behind the chase. The pursuit is TIGHT: the
-    // units ride the player's rear flanks at 6m, bumper-to-bumper, and
-    // AIR-1 hangs close overhead with its spotlight on the Falco GT;
-    // peds stand clear of the palm rows and of the police cars.
-    api.setTime(18.4, 0);
+    // Dusk chase on the BEACHFRONT (La Rambla, z=100), heading WEST into
+    // the sunset: hero coupe at 155 km/h, 5 PBPD units in varied states
+    // + AIR-1, wanted 4, mission 9 ("Hot Pursuit") in its chase stage —
+    // the post-finale chase mission, so the state is a full post-game
+    // profile (story complete, clean ending seen, Kingpin rep). The
+    // pursuit is TIGHT: units ride the player's flanks bumper-to-bumper,
+    // a roadblock waits ahead, one unit lies flipped on the road, and
+    // AIR-1 hangs close overhead with its spotlight on the Falco GT.
+    // The big low sun sits on the horizon over the causeway ahead.
+    api.setTime(18.5, 0);
     api.completeAllForEnding('clean');
+    api.setCash(51730);
     api.setLoyaltyFavor(65, 45);
-    api.setPlayerCar('coupe', 0, 20, 100, 0, 22);
-    api.addCar('sedan', 1, 52, 100, 0, 'traffic');
-    api.addCar('van', 0, 66, 96, 0, 'traffic');
-    // Working traffic lights: the beachfront light ahead is RED for the
-    // eastbound chase — the sedan waits at the stop line (x = 52.5) and a
-    // pedestrian waits at the painted crosswalk. A jet ski rides the bay
-    // to the right of the chase.
-    api.setLight(60, 100, 'ns-green');
-    api.addCrossingPed(60, 100);
-    api.addJetSki(70, 145, -Math.PI / 2, 3);
-    api.addPed(28, 105.5);
-    api.addPed(39, 94.5);
-    api.addPed(11, 106.5); // clear of PBPD-2's rear-right flank (18, 104)
+    api.setPlayerCar('coupe', 0, 20, 100, Math.PI, 43); // 155 km/h west
+    api.addCar('sedan', 1, -30, 100, Math.PI, 'traffic');
+    api.addCar('van', 0, -45, 96.5, Math.PI, 'traffic');
+    // A pedestrian crosses ahead at the -30 intersection (spawnCrossingPed
+    // puts the ped at (av-8, st-5), so (0,100) would stand inside the
+    // roadblock car — the -30 crossing is clear of every staged car).
+    api.addCrossingPed(-30, 100);
+    // Roadside peds, mirrored west, clear of the police cars.
+    api.addPed(-28, 105.5);
+    api.addPed(-39, 94.5);
+    api.addPed(-11, 106.5);
     // Beachgoers on the sand + walkers in Rambla Park, facing the road.
-    api.addPed(26, 117, Math.PI / 2);
-    api.addPed(38, 118, Math.PI / 2);
-    api.addPed(60, 118, Math.PI / 2);
-    api.addPed(84, 118, Math.PI / 2);
-    api.addPed(104, 117, Math.PI / 2);
-    api.addPed(36, 84, -Math.PI / 2);
-    api.addPed(46, 80, -Math.PI / 2);
-    api.addPed(40, 70, -Math.PI / 2);
-    api.startMissionAt(9, 1);
-    // Override the mission's wanted-3 with a full 3-star pursuit (the
-    // mission already sets wanted 3 — this just tops up heat/trace).
-    G.police.wanted = 3;
+    api.addPed(-26, 117, Math.PI / 2);
+    api.addPed(-38, 118, Math.PI / 2);
+    api.addPed(-60, 118, Math.PI / 2);
+    api.addPed(-84, 118, Math.PI / 2);
+    api.addPed(-104, 117, Math.PI / 2);
+    api.addPed(-36, 84, -Math.PI / 2);
+    api.addPed(-46, 80, -Math.PI / 2);
+    api.addPed(-40, 70, -Math.PI / 2);
+    api.startMissionAt(9, 1); // chase stage → timer 126 shows 02:06
+    // Override the mission's wanted-3 with a full 4-star pursuit.
+    G.police.wanted = 4;
     G.police.heat = 40;
     G.police.trace = 82;
     G.police.units = [];
-    // TIGHT chase: the units ride the player's flanks bumper-to-bumper —
-    // two on the rear quarters (6m out, big at the frame edges) and one
-    // closing on the front-left — never dead behind, where the chase cam
-    // would hide them behind the player car. AIR-1 hangs close overhead
-    // so the spotlight cone lands visibly on the Falco GT — low and far
-    // enough east that the whole helicopter stays inside the frame.
-    api.addPoliceCar(16, 95.5, 0, 24);
-    api.addPoliceCar(18, 104, 0, 23);
-    api.addPoliceCar(25, 96.5, 0, 22);
-    api.setHeli(52, 99, 14);
+    // PBPD-1 RAMMING, rear-left flank, 6m out (25,103 computes to 6m,
+    // matching the chatter line; 26,104 would read 7m).
+    const u1 = api.addPoliceCar(25, 103, Math.PI, 42);
+    u1.state = 'RAMMING'; u1.hold = true;
+    // PBPD-2 PURSUING, rear-right flank, 7m out.
+    api.addPoliceCar(26, 96, Math.PI, 41);
+    // PBPD-3 BOXING IN, ahead-left, 13m out, closing.
+    const u3 = api.addPoliceCar(8, 104, Math.PI, 44);
+    u3.state = 'BOXING IN'; u3.hold = true;
+    // PBPD-4 ROADBLOCK, across the road ahead (28m), parked sideways.
+    const u4 = api.addPoliceCar(-8, 100, Math.PI / 2, 0);
+    u4.state = 'ROADBLOCK'; u4.hold = true;
+    // One manual roadblock car completes the line (not a unit, so not in
+    // the panel).
+    api.addCar('police', 0, -8, 96.5, Math.PI / 2, 'roadblock');
+    // PBPD-5 FLIPPED on the road's north edge, ahead-right (22m), lying
+    // on its side with the wheels up. flipPitch is NEGATIVE: with the
+    // car's westward yaw, -PI/2 rolls the roof toward the chase camera
+    // (east); +PI/2 would show the black unlit belly instead.
+    const u5 = api.addPoliceCar(-2, 96.5, Math.PI + 0.4, 0);
+    u5.car.flipped = true;
+    u5.car.flipPitch = -Math.PI / 2;
+    u5.state = 'FLIPPED'; u5.hold = true;
+    api.setHeli(-14, 108, 14);
     G.playerX = 20; G.playerZ = 100;
     setUnitDistances(G);
+    // Score popups frozen mid-fade (ages 0.4s / 1.1s at t=24).
+    const ft = G.freezeT !== null && G.freezeT !== undefined ? G.freezeT : 24;
+    G.scorePopups = [
+      { label: 'DRIFT x3', amount: 150, t: ft - 0.4 },
+      { label: 'NEAR MISS', amount: 250, t: ft - 1.1 },
+    ];
     G.police.chatter = [
       { text: "Mara: Don't get boxed in — the causeway is clear.", t: 0 },
       { text: 'PBPD-1: I have visual — Falco GT, 6m out.', t: 0 },
+      { text: 'Dispatch: Roadblock forming at La Rambla, all units converge.', t: 0 },
     ];
+    G.camera.yaw = Math.PI; // chase cam behind the westbound car
     G.mode = 'play';
   } else if (name === 'combat') {
     // Night in Ciudad Vieja (NO rain — the HUD must not say RAIN): Theo
-    // on foot with the rifle, thugs closing in, muzzle flashes + tracers
-    // flying BOTH ways, red arrows over the hostiles, red dots on the
-    // minimap, HP/ARMOR bars under the weapon slots — and the mission-5
-    // CHOICE dialog open at the bottom with Mara's portrait.
+    // on foot with the rifle, five thugs closing in (two already down),
+    // muzzle flashes + tracers flying BOTH ways, damage numbers over the
+    // survivors, red arrows over the hostiles, red dots on the minimap,
+    // HP/ARMOR bars under the weapon slots — and the mission-5 crew
+    // conversation in Mara's portrait dialog at the bottom. Two PBPD
+    // units respond in the background; the district card names the
+    // neighbourhood.
     api.setTime(21.6, 0);
-    api.setCash(9870);
+    api.setCash(11240);
     api.setRep(2);
-    api.setLoyaltyFavor(58, 52);
+    api.setLoyaltyFavor(61, 47);
     const ms2 = api.missions();
     ms2.done = [1, 2, 3, 4];
     ms2.nextId = 5;
@@ -103,10 +135,29 @@ export function stageShot(G, api, name) {
     api.setLight(-60, -50, 'ew-green');
     api.addCrossingPed(-60, -50);
     // 3/4 camera angle: Theo's profile + rifle silhouette read against the
-    // lit street instead of a dead-behind shot.
-    G.camera.yaw = Math.PI / 2 + 0.55;
-    api.spawnEnemiesAt(-60, -64, 3);
-    api.addPoliceCar(-48, -50, Math.PI, 0);
+    // lit street instead of a dead-behind shot. The +0.15 offset (not
+    // +0.55) keeps the easternmost thug — and its damage number — inside
+    // the frame AND clear of the top-right HUD (cash/clock): +0.35 put
+    // the -48 HEAVY HIT number on top of the cash readout.
+    G.camera.yaw = Math.PI / 2 + 0.15;
+    api.spawnEnemiesAt(-60, -64, 5);
+    // Two thugs are already down — fallen bodies on the street (their
+    // fall is complete 0.5s in); they get no muzzle flash or tracer.
+    const dead = api.enemies().slice(0, 2);
+    const ft2 = G.freezeT !== null && G.freezeT !== undefined ? G.freezeT : 24;
+    for (const e of dead) {
+      e.dead = true;
+      e.hp = 0;
+      e.deadT = ft2 - 0.5;
+    }
+    // PBPD-1 at the avenue's east kerb, in frame ahead-right of Theo
+    // (the old (-48,-50) spot sits beside the camera and leaves the
+    // frame at this camera yaw).
+    api.addPoliceCar(-56, -56, Math.PI, 0);
+    // Second unit, north alley, still en route (held, so the panel keeps
+    // the EN ROUTE state instead of overwriting it by distance).
+    const u2 = api.addPoliceCar(-54, -68, Math.PI / 2, 0);
+    u2.state = 'EN ROUTE'; u2.hold = true;
     api.addPed(-56, -46);
     api.addPed(-64, -54);
     G.police.wanted = 2;
@@ -126,7 +177,20 @@ export function stageShot(G, api, name) {
     // screenshot (the 3 choices → 3 endings still play in the game).
     hideChoices();
     G.mode = 'play';
-    api.openDialog('MARA MARCHETTI', "Theo — Vireo's men are closing on the witness house. Three of them, up the north alley. Drop them, then get the witness out!");
+    api.openDialog('MARA MARCHETTI', "Theo — Vireo's men are closing on the witness house. Five of them, up the north alley. Two down — drop the rest, then get the witness out!");
+    // Combat counter + floating damage numbers over the three live thugs
+    // (ages 0.25s / 0.37s / 0.49s at t=24 — all inside the 1s window).
+    G.combatTotal = 5;
+    G.combatDown = 2;
+    const live = api.enemies().filter((e) => !e.dead);
+    G.damageNumbers = live.map((e, i) => ({
+      x: e.x, y: 2.0, z: e.z,
+      text: ['−45', '−32', '−48'][i],
+      sub: i === 2 ? 'HEAVY HIT' : null,
+      t: ft2 - 0.25 - i * 0.12,
+    }));
+    // District intro card, held in frame (no auto-hide in staging).
+    showDistrictCard('Ciudad Vieja', 'OLD TOWN');
     // Freeze a muzzle flash + tracer into the frame — Theo's shot AND
     // the enemies' return fire, so the frame reads as a gunfight.
     const p = api.player();
@@ -137,6 +201,7 @@ export function stageShot(G, api, name) {
     p.tracerTo = [p.x + Math.cos(p.yaw) * 18, 1.2, p.z - Math.sin(p.yaw) * 18];
     p.tracerTimer = 0.06;
     for (const e of api.enemies()) {
+      if (e.dead) continue; // fallen thugs don't shoot
       e.yaw = -Math.PI / 2; // face Theo (south)
       e.aiming = 1;
       const em = muzzlePos(e.x, 0, e.z, e.yaw, 0.6);
@@ -147,23 +212,24 @@ export function stageShot(G, api, name) {
       e.tracerTimer = 0.06;
     }
   } else if (name === 'map') {
-    // Pause screen over the city: full map with legend, mission list, stats,
+    // Pause screen over the city: full map with legend, STORY JOBS list
+    // (all 9 missions + payouts + the 3 endings), mission list, stats,
     // garage upgrades and save slots — every system in one frame.
     api.setTime(18.2, 0);
-    api.setCash(8450);
+    api.setCash(12740);
     api.setRep(2);
-    api.setLoyaltyFavor(60, 40);
+    api.setLoyaltyFavor(63, 37);
     api.setPlayerCar('sedan', 2, 30, 10, Math.PI / 2, 0);
     const ms = api.missions();
     ms.done = [1, 2, 3];
     ms.nextId = 4;
     api.profile().missionsDone = [1, 2, 3];
-    api.profile().postcards = [0, 1, 2, 3, 4, 5, 6];
+    api.profile().postcards = [0, 1, 2, 3, 4, 5, 6, 7, 8];
     api.profile().upgrades.engine = true;
-    api.profile().stats.kills = 14;
+    api.profile().stats.kills = 19;
     api.profile().stats.carsStolen = 5;
-    api.profile().stats.distanceDriven = 48200;
-    G.gameTime = 3720; // top bar reads "PLAYED 1h 2m"
+    api.profile().stats.distanceDriven = 61700;
+    G.gameTime = 5220; // top bar reads "PLAYED 1h 27m"
     api.startMissionAt(4, 0);
     api.openPause();
   } else if (name === 'ending') {
@@ -185,15 +251,38 @@ export function stageShot(G, api, name) {
     api.completeAllForEnding('clean');
     api.showEnding('clean');
   } else if (name === 'jetski') {
-    // Theo rides a Sea Dart across the bay at dusk, wake trailing,
-    // PBPD-free. The moored skis come from initWorld; this one is his
-    // ride. Frozen (?shot=jetski) it is the 04-jetski.jpg screenshot;
-    // with ?live=1 the staged scene stays playable (CDP test T15–T20).
-    api.setTime(18.4, 0);
-    api.setCash(5000);
+    // SEA CHASE at dusk: mission 4 "Low Tide" — Theo rides a Sea Dart
+    // across the bay at 72 km/h, wake trailing, with a PBPD police boat
+    // converging from the right and AIR-1 overhead. The mission text
+    // says the PBPD cannot follow on water; Mara's dialog lampshades the
+    // boat anyway. Frozen (?shot=jetski) it is the 04-jetski.jpg
+    // screenshot; with ?live=1 the staged scene stays playable (CDP
+    // test T15–T20).
+    api.setTime(18.5, 0);
+    api.setCash(6380);
     api.setRep(1);
     api.setLoyaltyFavor(50, 50);
-    api.setPlayerJetSki(24, 150, 0, 12); // east along the bay (clear water)
+    const ms4 = api.missions();
+    ms4.done = [1, 2, 3];
+    ms4.nextId = 4;
+    api.profile().missionsDone = [1, 2, 3];
+    api.startMissionAt(4, 2); // rideTo stage → timer 163 shows 02:43
+    api.setPlayerJetSki(80, 143, Math.PI + 0.26, 20); // WSW, 72 km/h
+    G.camera.yaw = Math.PI + 0.26;
+    api.seedWake(80, 143, Math.PI + 0.26, 20, 14);
+    api.addPoliceBoat(64, 143, Math.PI + 0.26, 18); // converging from the right
+    api.seedWake(64, 143, Math.PI + 0.26, 18, 8); // the boat's own wake
+    api.setHeli(48, 152, 12); // ahead, low
+    G.police.wanted = 2;
+    G.police.heat = 30;
+    G.police.trace = 64;
+    // The pursuit is the boat + heli; the response panel shows the
+    // AIR-1 row (the panel shows whenever units.length > 0 OR heli).
+    api.openDialog('MARA MARCHETTI', "They brought a boat, Theo — so much for 'they can't follow on water'. The rendezvous is past the island. Don't let them box you in!");
+    G.police.chatter = [
+      { text: 'PBPD Marine: Jet ski heading west-southwest, 72 out.', t: 0 },
+      { text: 'Zed: The rendezvous is past the island — keep moving.', t: 0 },
+    ];
     G.mode = 'play';
   }
 }

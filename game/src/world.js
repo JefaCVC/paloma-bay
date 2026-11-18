@@ -25,19 +25,19 @@ export const WET_SEED = 901; // marks road quads for the wet-road shader path
 // Palettes are Miami pastels, not beige: no two adjacent buildings share
 // a colour, and the beachfront (La Rambla) reads as a painted strand.
 export const DISTRICTS = [
-  { name: 'Porto Lumen', region: [-175, -125, -60, 60], style: 2, hMin: 6, hMax: 12,
+  { name: 'Porto Lumen', sub: 'THE OLD HARBOUR', region: [-175, -125, -60, 60], style: 2, hMin: 6, hMax: 12,
     palette: [[0.72, 0.66, 0.58], [0.55, 0.68, 0.78], [0.78, 0.70, 0.55], [0.88, 0.80, 0.62]] },
-  { name: 'Ciudad Vieja', region: [-120, -60, -105, -45], style: 0, hMin: 8, hMax: 16,
+  { name: 'Ciudad Vieja', sub: 'OLD TOWN', region: [-120, -60, -105, -45], style: 0, hMin: 8, hMax: 16,
     palette: [[0.85, 0.72, 0.55], [0.92, 0.55, 0.42], [0.88, 0.78, 0.62], [0.80, 0.62, 0.48]] },
-  { name: 'North Docks', region: [-60, 60, -155, -100], style: 1, hMin: 7, hMax: 13,
+  { name: 'North Docks', sub: 'THE DOCKS', region: [-60, 60, -155, -100], style: 1, hMin: 7, hMax: 13,
     palette: [[0.55, 0.55, 0.58], [0.48, 0.50, 0.55], [0.62, 0.58, 0.52]] },
-  { name: 'Palm Heights', region: [60, 175, -105, 0], style: 1, hMin: 16, hMax: 38,
+  { name: 'Palm Heights', sub: 'SKYLINE ROW', region: [60, 175, -105, 0], style: 1, hMin: 16, hMax: 38,
     palette: [[0.72, 0.76, 0.80], [0.65, 0.70, 0.75], [0.80, 0.78, 0.72], [0.55, 0.68, 0.82]] },
-  { name: 'Barrio Sol', region: [-60, 0, 0, 100], style: 2, hMin: 6, hMax: 11,
+  { name: 'Barrio Sol', sub: 'SUNSET BLOCKS', region: [-60, 0, 0, 100], style: 2, hMin: 6, hMax: 11,
     palette: [[0.85, 0.68, 0.45], [0.78, 0.55, 0.42], [0.90, 0.75, 0.55], [0.92, 0.60, 0.60], [0.45, 0.72, 0.68]] },
-  { name: 'La Rambla', region: [-120, 175, 50, 100], style: 0, hMin: 9, hMax: 20,
+  { name: 'La Rambla', sub: 'BEACHFRONT', region: [-120, 175, 50, 100], style: 0, hMin: 9, hMax: 20,
     palette: [[0.95, 0.55, 0.45], [0.45, 0.75, 0.72], [0.95, 0.88, 0.70], [0.95, 0.80, 0.40], [0.95, 0.65, 0.70], [0.60, 0.85, 0.70]] },
-  { name: 'Isla Verde', region: [-62, 62, 158, 242], style: 0, hMin: 5, hMax: 9,
+  { name: 'Isla Verde', sub: 'THE ISLAND', region: [-62, 62, 158, 242], style: 0, hMin: 5, hMax: 9,
     palette: [[0.85, 0.80, 0.68], [0.78, 0.72, 0.60], [0.90, 0.85, 0.75], [0.60, 0.85, 0.70]] },
 ];
 
@@ -48,6 +48,16 @@ export function districtAt(x, z) {
   }
   if (z > 100) return 'La Rambla';
   return 'Paloma Bay';
+}
+
+// Full district record for a point (or null outside all regions) — used by
+// the district intro card, which needs the name + subtitle together.
+export function districtInfo(x, z) {
+  for (const d of DISTRICTS) {
+    const [x0, x1, z0, z1] = d.region;
+    if (x >= x0 && x <= x1 && z >= z0 && z <= z1) return d;
+  }
+  return null;
 }
 
 // --- points of interest (fixed, named, used by missions + shops) ------------

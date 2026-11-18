@@ -15,11 +15,11 @@ import {
 import {
   AVENUES, BOAT_SPOTS, CITY, ISLAND, POI, POSTCARDS, STREETS, TRAFFIC_LIGHTS, WATER_Z,
   buildBeacon, buildFerrisWheel, buildPostcardMarker, buildTrafficLightLamps, buildWorld,
-  collideCircle, districtAt, lightPhase,
+  collideCircle, districtAt, districtInfo, lightPhase,
 } from './world.js';
 import {
   CAR_MODELS, buildCarBody, buildCarGlass, buildHelicopter, buildJetSki,
-  buildLightBar, buildWheel,
+  buildLightBar, buildPoliceBoat, buildWheel,
 } from './vehicles.js';
 import { CHAR, GAIT_K, MARA_LOOK, THEO_LOOK, buildCharacter, muzzlePos, randomLook } from './characters.js';
 import { WEAPONS, WEAPON_ORDER, buildAmmoPickup, buildMuzzleFlash, damageAt } from './weapons.js';
@@ -42,7 +42,7 @@ import { createInput, exitPointerLock, requestPointerLock } from './input.js';
 import {
   fillDeadScreen, fillEndingScreen, fillPauseScreen, fillShopScreen,
   fillTitleScreen, hideChoices, hideDialog, initHUD, showBanner, showChoices,
-  showDialog, showScreen, toast, updateHUD,
+  showDialog, showDistrictCard, showScreen, toast, updateHUD,
 } from './hud.js';
 import { stageShot } from './shots.js';
 
@@ -78,6 +78,16 @@ const G = {
   redLightFlag: null, // intersection last flagged for running a red light
   photoMode: false, // photo mode: world frozen, free camera, filters
   photoCam: null, // { yaw, pitch, dist, target: [x, y, z] }
+  missionTimer: null, // seconds left on the active stage's timer (null = no timer)
+  scorePopups: [], // { label, amount, t } DRIFT / NEAR MISS feedback
+  damageNumbers: [], // { x, y, z, text, sub, t } floating combat numbers
+  combatTotal: 0, // enemies in the active combat stage (0 = not combat)
+  combatDown: 0, // enemies down in the active combat stage
+  lastVP: null, // view-projection matrix of the last rendered frame
+  lastDistrict: null, // district name at the last district-card check
+  driftT: 0, // seconds of continuous handbrake drift
+  driftChain: 0, // current drift chain (reset on award)
+  nearMissed: new Set(), // traffic cars already awarded a near miss
 };
 
 const profile = () => G.state.profile;
@@ -101,6 +111,7 @@ const pickups = []; // { kind: 'ammo', weapon, x, z, t }
 const tracers = []; // transient, drawn for 60ms
 const jetskis = []; // { x, z, yaw, speed, steer, colorIdx, bobPhase, wakeT }
 const wakePuffs = []; // { x, z, t, s } fading foam discs behind a moving jet ski
+const boats = []; // police boats { x, z, yaw, speed, steer, bobPhase } — PBPD marine units
 
 // Traffic-light lookup by "x,z" key (the stop + crosswalk checks run per frame).
 const LIGHT_BY_KEY = new Map(TRAFFIC_LIGHTS.map((l) => [l.x + ',' + l.z, l]));
@@ -139,6 +150,7 @@ let rainMesh = null;
 let lightLampMesh = null; // dynamic traffic-light lamps (one mesh, all heads)
 let lightLampSig = ''; // phase signature the lamp mesh was built from
 let jetskiMeshes = []; // one mesh per JETSKI_COLORS entry
+let policeBoatMesh = null; // PBPD marine unit hull (uploaded once)
 let colliders = [];
 let charMeshes = new Map(); // entity -> dynamic mesh
 
@@ -204,6 +216,65 @@ function spawnJetSki(x, z, yaw, colorIdx) {
   };
   jetskis.push(ski);
   return ski;
+}
+
+// PBPD marine unit: a police boat that chases the player's jet ski. Only
+// one exists at a time (spawned by mission 4's sea chase or by staging).
+function spawnPoliceBoat(x, z, yaw) {
+  const boat = {
+    x, z, yaw, speed: 0, steer: 0,
+    bobPhase: Math.random() * TAU, wakeT: 0,
+  };
+  boats.push(boat);
+  return boat;
+}
+
+// Marine pursuit: while the player rides a jet ski, the boat steers toward
+// them (slower than the ski's top speed, so the chase is escapable); on
+// land it idles. Water bounds match the jet ski's (bay minus island and
+// causeway).
+function updateBoats(dt) {
+  for (const b of boats) {
+    if (player.onJetSki) {
+      const dx = player.x - b.x, dz = player.z - b.z;
+      const d = Math.hypot(dx, dz);
+      const wantYaw = Math.atan2(-dz, dx);
+      b.yaw = b.yaw + wrapAngle(wantYaw - b.yaw) * Math.min(1, 2.2 * dt);
+      const wantSpeed = d > 10 ? 24 : Math.min(24, Math.abs(player.jetski.speed) + 2);
+      b.speed = damp(b.speed, wantSpeed, 1.2, dt);
+    } else {
+      b.speed = damp(b.speed, 0, 1.5, dt);
+    }
+    const fx = Math.cos(b.yaw), fz = -Math.sin(b.yaw);
+    let nx = b.x + fx * b.speed * dt;
+    let nz = b.z + fz * b.speed * dt;
+    nx = clamp(nx, -168, 168);
+    nz = clamp(nz, 141, 198);
+    if (nx > -67.2 && nx < 67.2 && nz > 156.8) {
+      const pl = nx + 67.2, pr = 67.2 - nx, pt = nz - 156.8;
+      if (pt <= pl && pt <= pr) { nz = 156.8; b.speed *= 0.5; }
+      else if (pl < pr) { nx = -67.2; b.speed *= 0.5; }
+      else { nx = 67.2; b.speed *= 0.5; }
+    }
+    if (Math.abs(nx) < 5.4 && nz < 159.2 && nz > 140) {
+      const pl = nx + 5.4, pr = 5.4 - nx, pb = 159.2 - nz;
+      if (pb <= pl && pb <= pr) { nz = 159.2; b.speed *= 0.5; }
+      else if (pl < pr) { nx = -5.4; b.speed *= 0.5; }
+      else { nx = 5.4; b.speed *= 0.5; }
+    }
+    b.x = nx;
+    b.z = nz;
+    // Wake behind the boat while moving.
+    b.wakeT -= dt;
+    if (Math.abs(b.speed) > 6 && b.wakeT <= 0) {
+      b.wakeT = 0.07;
+      wakePuffs.push({
+        x: b.x - fx * 2.6, z: b.z - fz * 2.6,
+        t: G.time, s: 1.2 + Math.abs(b.speed) * 0.03,
+      });
+      if (wakePuffs.length > 40) wakePuffs.shift();
+    }
+  }
 }
 
 function spawnEnemy(x, z, kind, weapon) {
@@ -277,8 +348,9 @@ function initWorld() {
   // Traffic-light lamps: one dynamic mesh, rebuilt whenever any phase flips.
   lightLampMesh = uploadMesh(buildTrafficLightLamps(0, G.lightOverrides).build(), true);
   lightLampSig = lightSignature(0);
-  // Jet skis: one mesh per colour.
+  // Jet skis: one mesh per colour. Police boat: one shared hull.
   jetskiMeshes = JETSKI_COLORS.map((c) => uploadMesh(buildJetSki(c), false));
+  policeBoatMesh = uploadMesh(buildPoliceBoat(), false);
   // Parked cars along the streets (stealable).
   const rng = rng32(99);
   const models = ['sedan', 'sedan', 'coupe', 'muscle', 'suv', 'van', 'taxi'];
@@ -537,10 +609,17 @@ function fireWeapon() {
 
 function damageEnemy(e, dmg, fromX, fromZ) {
   e.hp -= dmg;
+  // Floating damage number over the enemy (projected in hudView).
+  G.damageNumbers.push({
+    x: e.x, y: 1.9, z: e.z, text: '−' + dmg,
+    sub: dmg >= 40 ? 'HEAVY HIT' : null, t: G.time,
+  });
+  if (G.damageNumbers.length > 12) G.damageNumbers.shift();
   if (e.hp <= 0 && !e.dead) {
     e.dead = true;
     e.deadT = G.time;
     profile().stats.kills++;
+    if (G.combatTotal > 0) G.combatDown++;
     if (Math.random() < 0.5) {
       pickups.push({ kind: 'ammo', weapon: e.weapon, x: e.x, z: e.z, t: G.time });
     }
@@ -820,6 +899,29 @@ function updateDriving(dt) {
       }
       car.speed *= 0.85;
     }
+    // Near miss: threading past a traffic car at speed pays $250 (once per
+    // car until it is 8m away again).
+    if (d >= 3.4 && d < 5.5 && Math.abs(car.speed) > 15 && other.kind === 'traffic' && !G.nearMissed.has(other)) {
+      G.nearMissed.add(other);
+      profile().cash += 250;
+      G.scorePopups.push({ label: 'NEAR MISS', amount: 250, t: G.time });
+      sfxCash();
+    }
+    if (d > 8) G.nearMissed.delete(other);
+  }
+  // Drift scoring: handbrake + hard steer at speed builds a chain;
+  // releasing after 0.8s pays $50 per chain level (max x5) as a popup.
+  if (handbrake && Math.abs(car.steer) > 0.5 && Math.abs(car.speed) > 12) {
+    G.driftT += dt;
+  } else if (G.driftT > 0.8) {
+    const chain = Math.min(5, 1 + Math.floor(G.driftT));
+    const amount = 50 * chain;
+    profile().cash += amount;
+    G.scorePopups.push({ label: 'DRIFT x' + chain, amount, t: G.time });
+    sfxCash();
+    G.driftT = 0;
+  } else {
+    G.driftT = 0;
   }
   const moved = Math.hypot(pos[0] - car.x, pos[2] - car.z);
   car.x = pos[0];
@@ -894,7 +996,7 @@ function mustStopAtLight(av, st, dir, distToStopLine, t) {
 // ============================================================================
 function updateTraffic(dt) {
   for (const car of cars) {
-    if (car.kind !== 'traffic') continue;
+    if (car.kind !== 'traffic' || !car.ai) continue;
     const ai = car.ai;
     const model = CAR_MODELS[car.model];
     // Drive along the current road; at intersections, sometimes turn.
@@ -1101,8 +1203,10 @@ function updatePoliceUnits(dt) {
       }
     }
   }
-  // Chase: steer each police car toward the player.
+  // Chase: steer each police car toward the player. Held units (FLIPPED /
+  // ROADBLOCK staged by a mission or screenshot) stay parked.
   for (const u of pol.units) {
+    if (u.hold) continue;
     const car = u.car;
     if (!car) continue;
     const model = CAR_MODELS.police;
@@ -1199,6 +1303,15 @@ function startMissionAtBeacon() {
 function beginStage() {
   const stage = currentStage(missions());
   if (!stage) return;
+  // Stage timer (soft display countdown; null = no timer) + combat counter.
+  G.missionTimer = stage.timer != null ? stage.timer : null;
+  if (stage.type === 'combat') {
+    G.combatTotal = stage.count;
+    G.combatDown = 0;
+  } else {
+    G.combatTotal = 0;
+    G.combatDown = 0;
+  }
   if (stage.type === 'combat') {
     for (let i = 0; i < stage.count; i++) {
       const a = (i / stage.count) * TAU;
@@ -1276,6 +1389,10 @@ function updateMission(dt) {
   if (!ms.active) return;
   const stage = currentStage(ms);
   if (!stage) return;
+  // Stage timer: counts down, expires at 00:00, never fails the mission.
+  if (G.missionTimer !== null && G.missionTimer > 0) {
+    G.missionTimer = Math.max(0, G.missionTimer - dt);
+  }
   if (stage.type === 'driveTo' || stage.type === 'deliver' || stage.type === 'escape') {
     const d = Math.hypot(stage.x - player.x, stage.z - player.z);
     if (d < 7) advanceMissionStage();
@@ -1537,14 +1654,15 @@ function hudView() {
     }
     mission = {
       active: true,
+      id: ms.active.mission.id,
       name: ms.active.mission.name,
       stageIndex: ms.active.stageIndex,
       stages: ms.active.mission.stages.length,
-      objective: stage.type === 'combat'
-        ? stage.text + ' (' + enemies.filter((e) => !e.dead && e.kind === 'thug').length + ' left)'
-        : stage.text,
+      objective: stage.text,
       dist, mx, mz,
       next: stage.next || '',
+      timer: G.missionTimer,
+      counter: G.combatTotal > 0 ? { down: G.combatDown, total: G.combatTotal } : null,
     };
   } else if (G.missionBeacon) {
     mission = {
@@ -1573,9 +1691,24 @@ function hudView() {
       Math.hypot(G.police.heli.x - player.x, G.police.heli.z - player.z),
     );
   }
+  // IN SIGHT badge: first unit close enough to have eyes on the player.
+  const sighted = G.police.units.find((u) => (u.dist || 999) < 70);
+  G.police.inSight = sighted ? sighted.name : null;
+  // Prune expired feedback here (hud.js only renders the survivors).
+  G.scorePopups = G.scorePopups.filter((p) => G.time - p.t < 2.5);
+  G.damageNumbers = G.damageNumbers.filter((n) => G.time - n.t < 1);
+  const scorePopups = G.scorePopups.map((p) => ({ label: p.label, amount: p.amount, age: G.time - p.t }));
+  const damageNumbers = [];
+  for (const n of G.damageNumbers) {
+    const s = projectWorld(n.x, n.y, n.z);
+    if (s) damageNumbers.push({ sx: s.sx, sy: s.sy, text: n.text, sub: n.sub, age: G.time - n.t });
+  }
   return {
     profile: profile(),
     police: G.police,
+    boats: boats.map((b) => ({ x: b.x, z: b.z })),
+    scorePopups,
+    damageNumbers,
     seen: G.police.wanted > 0 && anyUnitSees(G.police, player.x, player.z),
     mission,
     missionList: MISSIONS.map((m) => ({
@@ -1828,11 +1961,41 @@ function charMeshFor(entity, look, pose) {
   return mesh;
 }
 
+// Model matrix for a car: flipped cars lie on their side (pitch ~90 deg
+// around the forward axis, origin lifted so the flank rests on the ground);
+// normal cars sit on the road. Used by BOTH the body loop and the glass
+// pass, so a flipped car never keeps an upright glasshouse.
+function carFrame(car) {
+  if (car.flipped) {
+    return frame(car.x, 1.0, car.z, car.yaw, car.flipPitch || Math.PI / 2, 0, 1);
+  }
+  return frame(car.x, 0.02, car.z, car.yaw, 0, 0, 1);
+}
+
+// Project a world point to screen pixels (for damage numbers). Returns
+// null when behind the camera or far outside the frame.
+function projectWorld(x, y, z) {
+  const vp = G.lastVP;
+  if (!vp) return null;
+  const cx = vp[0] * x + vp[4] * y + vp[8] * z + vp[12];
+  const cy = vp[1] * x + vp[5] * y + vp[9] * z + vp[13];
+  const cw = vp[3] * x + vp[7] * y + vp[11] * z + vp[15];
+  if (cw <= 0) return null;
+  const nx = cx / cw, ny = cy / cw;
+  const w = canvas.clientWidth || canvas.width;
+  const h = canvas.clientHeight || canvas.height;
+  const sx = (nx * 0.5 + 0.5) * w;
+  const sy = (1 - (ny * 0.5 + 0.5)) * h;
+  if (sx < -50 || sx > w + 50 || sy < -50 || sy > h + 50) return null;
+  return { sx, sy };
+}
+
 function renderFrame(t) {
   const cam = G.camView || updateCamera(2);
   const view = m4.lookAt(camPos, cam.target, [0, 1, 0]);
   const proj = m4.perspective((cam.fov * Math.PI) / 180, canvas.width / canvas.height, 0.1, 500);
   const vp = m4.multiply(proj, view);
+  G.lastVP = vp; // damage-number projection uses the last rendered frame
   const invVP = m4.invert(vp);
   const IDENT = m4.identity();
   // One tracer streak, shared by the player and every enemy: a unit box
@@ -1894,8 +2057,8 @@ function renderFrame(t) {
   // Cars.
   for (const car of cars) {
     const model = CAR_MODELS[car.model];
-    const carM = frame(car.x, 0.02, car.z, car.yaw, 0, 0, 1);
-    const roll = car.steer * Math.min(1, Math.abs(car.speed) / 20) * 0.05;
+    const carM = carFrame(car);
+    const roll = car.flipped ? 0 : car.steer * Math.min(1, Math.abs(car.speed) / 20) * 0.05;
     const bodyM = m4.multiply(carM, frame(0, 0, 0, 0, 0, roll, 1));
     drawLit(carBodyMesh(car.model, car.colorIdx), bodyM, m4.multiply(vp, bodyM), t, 1);
     for (const wx of model.wheelX) {
@@ -1934,6 +2097,16 @@ function renderFrame(t) {
     const skiM = frame(ski.x, -0.38 + bobY, ski.z, ski.yaw, pitch, roll, 1);
     drawLit(jetskiMeshes[ski.colorIdx % jetskiMeshes.length], skiM, m4.multiply(vp, skiM), t, 1);
     drawBlob(carBlobMesh, m4.multiply(vp, frame(ski.x, -0.35, ski.z, ski.yaw, 0, 0, 1)), [0.02, 0.05, 0.08, 0.25]);
+  }
+  // Police boats (PBPD marine units): bobbing hulls with lit light bars.
+  for (const b of boats) {
+    const bobY = Math.sin(t * 1.6 + b.x * 0.15 + b.bobPhase) * 0.07;
+    const pitch = Math.sin(t * 1.3 + b.z * 0.1 + b.bobPhase) * 0.03
+      + clamp(b.speed * 0.002, 0, 0.05);
+    const roll = -b.steer * clamp(Math.abs(b.speed) / 20, 0, 1) * 0.08;
+    const boatM = frame(b.x, -0.35 + bobY, b.z, b.yaw, pitch, roll, 1);
+    if (policeBoatMesh) drawLit(policeBoatMesh, boatM, m4.multiply(vp, boatM), t, 1);
+    drawBlob(carBlobMesh, m4.multiply(vp, frame(b.x, -0.35, b.z, b.yaw, 0, 0, 1.6)), [0.02, 0.05, 0.08, 0.25]);
   }
   // Wake foam: fading white discs that grow as they age.
   for (let i = wakePuffs.length - 1; i >= 0; i--) {
@@ -1986,7 +2159,9 @@ function renderFrame(t) {
       breathe: 1, breathT: t * 1.6 + pd.x, aiming: 0, weapon: null, swing: 0,
     });
     const fall = pd.dead ? Math.min(1, (G.time - pd.deadT) * 3) : 0;
-    const chM = frame(pd.x, 0.02, pd.z, pd.yaw, 0, -fall * (Math.PI / 2), 1);
+    // A falling body rotates around its feet, so half the torso ends up
+    // below the ground; lift it as it falls so it lies ON the street.
+    const chM = frame(pd.x, 0.02 + fall * 0.22, pd.z, pd.yaw, 0, -fall * (Math.PI / 2), 1);
     drawLit(mesh, chM, m4.multiply(vp, chM), t, 1);
     if (!pd.dead) drawBlob(charBlobMesh, m4.multiply(vp, frame(pd.x, 0.05, pd.z, 0, 0, 0, 1)), [0.05, 0.03, 0.02, 0.3]);
   }
@@ -1999,9 +2174,15 @@ function renderFrame(t) {
       breathe: 1, breathT: t * 1.6 + e.x, aiming: e.aiming, weapon: e.weapon, swing: 0,
     });
     const fall = e.dead ? Math.min(1, (G.time - e.deadT) * 3) : 0;
-    const chM = frame(e.x, 0.02, e.z, e.yaw, 0, -fall * (Math.PI / 2), 1);
+    // A falling body rotates around its feet, so half the torso ends up
+    // below the ground; lift it as it falls so it lies ON the street.
+    const chM = frame(e.x, 0.02 + fall * 0.22, e.z, e.yaw, 0, -fall * (Math.PI / 2), 1);
     drawLit(mesh, chM, m4.multiply(vp, chM), t, 1);
     if (!e.dead) drawBlob(charBlobMesh, m4.multiply(vp, frame(e.x, 0.05, e.z, 0, 0, 0, 1)), [0.05, 0.03, 0.02, 0.3]);
+    // Fallen enemies leave a dark stain on the ground — at night a
+    // dark-clothed body on dark asphalt is otherwise invisible, and the
+    // "2 down" story needs a visible body.
+    else drawBlob(charBlobMesh, m4.multiply(vp, frame(e.x, 0.05, e.z, 0, 0, 0, 2.2)), [0.55, 0.08, 0.08, 0.8]);
     if (e.dead) continue;
     // Hostile marker: a red arrow floating above the head, bobbing and
     // gently pulsing so hostiles read instantly.
@@ -2039,7 +2220,7 @@ function renderFrame(t) {
 
   // Glass pass (car glass, blended, after opaque).
   for (const car of cars) {
-    const carM = frame(car.x, 0.02, car.z, car.yaw, 0, 0, 1);
+    const carM = carFrame(car);
     drawLit(carGlassMesh(car.model), carM, m4.multiply(vp, carM), t, 0.32, true);
   }
 
@@ -2120,6 +2301,7 @@ function update(dt) {
   updatePeds(dt);
   updateEnemies(dt);
   updatePoliceUnits(dt);
+  updateBoats(dt);
   updatePolice(G.police, dt, G.gameTime, {
     x: player.x, z: player.z,
     vx: player.inCar && player.car ? Math.cos(player.car.yaw) * player.car.speed : 0,
@@ -2128,6 +2310,18 @@ function update(dt) {
   });
   updateMission(dt);
   updatePickups(dt);
+
+  // District intro card: entering a new district flashes its GTA-style
+  // card (name + subtitle) for a few seconds.
+  {
+    const d = districtInfo(player.x, player.z);
+    if (d && d.name !== G.lastDistrict) {
+      G.lastDistrict = d.name;
+      showDistrictCard(d.name, d.sub, 3200);
+    } else if (!d) {
+      G.lastDistrict = null;
+    }
+  }
 
   // Busted: on foot, wanted, cops close and the player is still.
   if (!player.inCar && G.police.wanted > 0) {
@@ -2262,6 +2456,9 @@ function wireScreens() {
   const startPlay = () => {
     initAudio();
     G.mode = 'play';
+    // Seed the district tracker so no intro card fires on load.
+    const d0 = districtInfo(player.x, player.z);
+    G.lastDistrict = d0 ? d0.name : null;
     // Face the camera behind the player from the first frame: the spawn
     // yaw is west (toward the taxi), so the camera starts east of the
     // player instead of swinging in from the title orbit.
@@ -2469,7 +2666,11 @@ function shotApi() {
     missions() { return missions(); },
     profile() { return profile(); },
     addCar(model, colorIdx, x, z, yaw, kind) {
-      return spawnCar(model, colorIdx, x, z, yaw, kind || 'traffic');
+      // Staged traffic cars need an AI (updateTraffic reads ai.speed) or
+      // the first live tick throws and kills the frame loop. Parked and
+      // police/roadblock cars never enter updateTraffic.
+      const ai = kind === 'traffic' ? { speed: 12 } : null;
+      return spawnCar(model, colorIdx, x, z, yaw, kind || 'traffic', ai);
     },
     addPed(x, z, yaw) {
       const ped = spawnPed(x, z, [[x, z], [x + 6, z + 2]]);
@@ -2485,6 +2686,26 @@ function shotApi() {
     },
     addJetSki(x, z, yaw, colorIdx) {
       return spawnJetSki(x, z, yaw, colorIdx || 0);
+    },
+    addPoliceBoat(x, z, yaw, speed) {
+      const boat = spawnPoliceBoat(x, z, yaw);
+      boat.speed = speed || 0;
+      return boat;
+    },
+    seedWake(x, z, yaw, speed, count) {
+      // Foam puffs trailing a jet ski / boat in a frozen frame: spaced
+      // behind the craft along its heading (one per 0.09s of travel),
+      // aged so the trail reads oldest-farthest. All ages stay inside
+      // the render window (1.4s) for count <= 15.
+      const fx = Math.cos(yaw), fz = -Math.sin(yaw);
+      const now = G.freezeT !== null ? G.freezeT : 24;
+      for (let i = 0; i < (count || 10); i++) {
+        const back = 1.5 + i * ((speed || 12) * 0.09);
+        wakePuffs.push({
+          x: x - fx * back, z: z - fz * back,
+          t: now - i * 0.09, s: 1.0 + i * 0.06,
+        });
+      }
     },
     setPlayerJetSki(x, z, yaw, speed) {
       const ski = spawnJetSki(x, z, yaw, 0);
@@ -2567,6 +2788,11 @@ function shotApi() {
     },
     openDialog(speaker, text) {
       showDialog(speaker, text);
+      // Staged dialogs must be dismissable in live mode, like every other
+      // dialog (the pawn interaction sets the same advance). Without this,
+      // the dialog never closes on click/E — and E falls through to
+      // doInteract(), so pressing E on the jet ski EXITS it instead.
+      G.dialogAdvance = () => hideDialog();
     },
     openPause() {
       G.mode = 'pause';

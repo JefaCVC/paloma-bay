@@ -285,6 +285,40 @@ export function buildJetSki(color) {
   return bd.build();
 }
 
+// PBPD marine unit: a white patrol boat with a blue stripe, a cabin with a
+// glass windshield, an outboard motor, and a red/blue light bar on the
+// cabin roof (both halves always lit, so a frozen frame reads the colours).
+// Same hull profile as the moored motorboats in world.js — the marine unit
+// is one of the bay's boats, in police colours.
+export function buildPoliceBoat() {
+  const bd = new MeshBuilder();
+  // Hull: side profile extruded across the beam (bow at +X).
+  bd.setMat(MAT.PAINT).setColor(0.92, 0.92, 0.94);
+  bd.extrude(
+    [[2.6, 0.15], [2.2, 0.75], [0.5, 0.9], [-2.0, 0.9], [-2.6, 0.55], [-2.2, 0.1], [1.6, 0.05]],
+    -0.85, 0.85,
+  );
+  // Blue PBPD stripe along each flank, proud of the hull side.
+  bd.setMat(MAT.PAINT).setColor(0.15, 0.35, 0.85);
+  bd.quad([2.0, 0.45, 0.855], [-2.0, 0.45, 0.855], [-2.0, 0.62, 0.855], [2.0, 0.62, 0.855]);
+  bd.quad([-2.0, 0.45, -0.855], [2.0, 0.45, -0.855], [2.0, 0.62, -0.855], [-2.0, 0.62, -0.855]);
+  // Deck + cabin + glass windshield.
+  bd.setMat(MAT.PLAIN).setColor(0.85, 0.85, 0.88);
+  bd.quad([-1.9, 0.92, -0.7], [1.9, 0.92, -0.7], [1.9, 0.92, 0.7], [-1.9, 0.92, 0.7]);
+  bd.setMat(MAT.PLAIN).setColor(0.92, 0.92, 0.94);
+  bd.box(-0.9, 0.9, -0.6, 0.9, 1.7, 0.6); // cabin
+  bd.setMat(MAT.GLASS).setColor(0.55, 0.70, 0.78);
+  bd.box(0.5, 1.1, -0.62, 0.9, 1.55, 0.62); // windshield
+  bd.setMat(MAT.PLAIN).setColor(0.12, 0.12, 0.14);
+  bd.box(-2.6, 0.35, -0.3, -2.3, 0.9, 0.3); // outboard motor
+  // Light bar on the cabin roof: red port + blue starboard, both lit.
+  bd.setMat(MAT.EMIT).setColor(1.0, 0.15, 0.10);
+  bd.box(-0.25, 1.70, -0.55, 0.25, 1.95, -0.05);
+  bd.setMat(MAT.EMIT).setColor(0.15, 0.40, 1.0);
+  bd.box(-0.25, 1.70, 0.05, 0.25, 1.95, 0.55);
+  return bd.build();
+}
+
 // Police light bar: red left half + blue right half (from the chase cam,
 // red reads on the left, blue on the right), each in a bright and a dim
 // variant. The draw loop alternates which side is bright, so the bar

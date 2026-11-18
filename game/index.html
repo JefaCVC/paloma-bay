@@ -72,7 +72,9 @@
      The rows end well inside the dark zone: mission text is capped by
      the panel's right padding, response rows by their own right padding. */
   #response-panel { padding: 6px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.62) 0%, rgba(8,12,20,0.62) 84%, rgba(8,12,20,0) 100%); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-  #response-panel h5 { margin: 0 0 4px; font-size: 11px; letter-spacing: 1.5px; color: var(--red); text-align: left; }
+  #response-panel h5 { margin: 0 0 4px; font-size: 11px; letter-spacing: 0.5px; color: var(--red); text-align: left; white-space: nowrap; }
+  #response-insight { display: none; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #ffb3b3; border: 1px solid var(--red); background: rgba(255,42,42,0.25); border-radius: 10px; padding: 2px 8px; margin: 0 0 4px 0; width: fit-content; white-space: nowrap; }
+  #response-more { font-size: 12px; color: var(--muted); margin-top: 2px; padding-right: 48px; white-space: nowrap; }
   .resp-row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; color: #e8ecf4; white-space: nowrap; padding-right: 48px; }
   .resp-row .st { color: var(--amber); }
   .resp-row .d { color: #9fb0c8; }
@@ -81,7 +83,10 @@
   #radio { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   #mission-panel { padding: 8px 48px 8px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.62) 0%, rgba(8,12,20,0.62) 84%, rgba(8,12,20,0) 100%); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  #mission-num { font-size: 11px; letter-spacing: 2px; color: var(--muted); }
   #mission-name { font-size: 15px; font-weight: 700; color: var(--amber); }
+  #mission-timer { font-size: 20px; font-weight: 900; color: var(--amber); letter-spacing: 2px; }
+  #mission-counter { font-size: 13px; font-weight: 700; color: var(--amber); }
   #mission-stage { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
   #mission-objective { font-size: 14px; margin-top: 4px; }
   #mission-dist { font-size: 13px; color: var(--blue); }
@@ -194,6 +199,29 @@
     position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
     background: radial-gradient(ellipse at center, transparent 55%, rgba(160, 0, 0, 0.55) 100%);
   }
+  /* Score popups: DRIFT / NEAR MISS feedback, centre-screen, above the
+     dialog (which sits at bottom 96px) and below the banner (top 18%). */
+  #score-popups {
+    position: fixed; left: 50%; top: 30%; transform: translateX(-50%);
+    text-align: center; z-index: 6; pointer-events: none;
+  }
+  .score-pop { font-size: 22px; font-weight: 900; color: #7ddb52; text-shadow: 0 2px 6px rgba(0,0,0,0.9); line-height: 1.3; white-space: nowrap; }
+  .score-pop .amt { font-size: 18px; }
+  /* Damage numbers: projected world positions, rising + fading. */
+  #damage-numbers { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+  .dmg-num { position: absolute; font-size: 16px; font-weight: 900; color: #ffd23e; text-shadow: 0 1px 4px rgba(0,0,0,0.9); transform: translate(-50%, -50%); white-space: nowrap; text-align: center; }
+  .dmg-num.heavy { color: #ff5a4a; font-size: 18px; }
+  .dmg-num .dmg-sub { display: block; font-size: 10px; letter-spacing: 1px; }
+  /* District intro card: GTA-style big italic name + subtitle, left side
+     above the minimap (bottom 300px clears the 180px minimap + meters). */
+  #district-card {
+    position: fixed; left: 24px; bottom: 300px; z-index: 6; pointer-events: none;
+    display: none; opacity: 1; transition: opacity 0.8s;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+  }
+  #district-card.fade { opacity: 0; }
+  #district-card .dc-name { font-size: 40px; font-style: italic; font-weight: 900; color: #fff; line-height: 1.05; white-space: nowrap; }
+  #district-card .dc-sub { font-size: 14px; letter-spacing: 4px; color: var(--amber); margin-top: 4px; }
 
   /* ---- full screens ---- */
   .screen {
@@ -237,7 +265,11 @@
   .set-row input[type="range"] { flex: 1; }
   .set-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
   #title-bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+  #title-bottom-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 680px; }
   .tagline { font-size: 14px; color: #e8e8e8; max-width: 640px; line-height: 1.5; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+  #title-features { font-size: 12px; font-weight: 700; color: var(--amber); letter-spacing: 1px; line-height: 1.5; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+  #title-features .tf-line { display: block; }
+  #title-features .tf-note { display: block; font-weight: 400; font-style: italic; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
   #title-portraits { display: flex; gap: 10px; flex: none; }
   .title-char { display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .title-char svg { border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
@@ -254,7 +286,7 @@
 
   /* pause screen: top bar + 3 columns + bottom bar */
   #pause-screen { justify-content: flex-start; }
-  #pause-topbar { display: flex; align-items: center; gap: 16px; width: 100%; max-width: 1220px; margin-bottom: 10px; }
+  #pause-topbar { display: flex; align-items: center; gap: 16px; width: 100%; max-width: 1220px; margin-bottom: 8px; }
   .pause-brand { font-size: 20px; font-weight: 900; letter-spacing: 4px; color: var(--amber); flex: none; }
   .pause-paused { font-size: 13px; font-weight: 700; letter-spacing: 3px; color: #fff; background: rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 4px; flex: none; }
   #pause-clock { font-size: 13px; color: var(--muted); flex: none; white-space: nowrap; }
@@ -274,7 +306,18 @@
   .pause-center-panel h4:not(:first-child) { margin-top: 16px; }
   .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 12px; color: var(--muted); }
   .legend b { color: var(--text); }
-  .ptile { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; gap: 8px; }
+  /* STORY JOBS mini-list (left column, under SAVE GAME): all 9 missions
+     with payout + status, plus the endings line — the pause screen's
+     densest block, kept tight so the bottom bar stays visible at 720p. */
+  .story-mini-row { display: flex; justify-content: space-between; font-size: 11px; line-height: 1.25; padding: 0; gap: 8px; }
+  .story-mini-row .smr-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .story-mini-row .smr-right { flex: none; font-weight: 700; }
+  .story-mini-row.done .smr-right { color: var(--green); }
+  .story-mini-row.open .smr-right { color: var(--amber); }
+  .story-mini-row.locked { opacity: 0.5; }
+  .story-endings { font-size: 11px; color: var(--muted); line-height: 1.4; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
+  .story-endings b { color: var(--amber); }
+  .ptile { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; gap: 8px; }
   .ptile-k { color: var(--muted); letter-spacing: 1px; }
   .ptile-v { font-weight: 700; text-align: right; }
   .job-name { font-size: 15px; font-weight: 700; color: var(--amber); }
@@ -293,9 +336,9 @@
   .story-status { font-size: 11px; font-weight: 700; letter-spacing: 1px; flex: none; }
   .story-row.done .story-status { color: var(--green); }
   .story-row.open .story-status { color: var(--amber); }
-  #pause-bottombar { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1220px; margin-top: 10px; }
+  #pause-bottombar { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1220px; margin-top: 8px; }
   .pause-hints { font-size: 12px; color: var(--muted); }
-  .side-block { padding: 8px 12px; }
+  .side-block { padding: 6px 12px; }
   .side-block h4 { margin: 0 0 6px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
   .prow { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; gap: 8px; }
   .prow span:last-child { text-align: right; }
@@ -303,7 +346,7 @@
   .prow.open span:last-child { color: var(--amber); }
   .prow.locked { opacity: 0.45; }
   .pause-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-  #pause-saves .btn { flex: 1 1 0; padding: 8px 4px; font-size: 13px; }
+  #pause-saves .btn { flex: 1 1 0; padding: 5px 4px; font-size: 13px; }
   .pause-btns .btn { flex: 1 1 0; min-width: 0; padding: 8px 6px; font-size: 13px; }
 
   /* shop + ending + dead */
@@ -332,15 +375,20 @@
 <div id="hud">
   <div class="corner" id="corner-tl">
     <div id="mission-panel">
+      <div id="mission-num">MISSION 1/9</div>
       <div id="mission-name">Night Shift</div>
+      <div id="mission-timer">02:06</div>
       <div id="mission-stage">STAGE 1/5</div>
       <div id="mission-objective">Drive to Zed's Pawn</div>
+      <div id="mission-counter"></div>
       <div id="mission-dist"></div>
       <div id="mission-next"></div>
     </div>
     <div id="response-panel">
-      <h5>PBPD RESPONSE</h5>
+      <h5 id="response-header">PBPD RESPONSE</h5>
+      <div id="response-insight"></div>
       <div id="response-rows"></div>
+      <div id="response-more"></div>
     </div>
     <div id="chatter"></div>
   </div>
@@ -421,6 +469,9 @@
   <div id="choices"></div>
   <div id="banner"><div id="banner-title" class="outline"></div><div id="banner-sub" class="outline"></div></div>
   <div id="toast"></div>
+  <div id="score-popups"></div>
+  <div id="damage-numbers"></div>
+  <div id="district-card"><div class="dc-name"></div><div class="dc-sub"></div></div>
 </div>
 
 <div id="photo-bar">
@@ -481,7 +532,14 @@
     <button class="btn" id="btn-settings-back">BACK</button>
   </div>
   <div id="title-bottom">
-    <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Nine missions. Three choices. Three endings.</div>
+    <div id="title-bottom-left">
+      <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Nine missions. Three choices. Three endings.</div>
+      <div id="title-features">
+        <span class="tf-line">9 story missions · 3 endings · 6 districts + island · 20 postcards</span>
+        <span class="tf-line">5 weapons · jet ski · 2 radio stations · police chases &amp; helicopter</span>
+        <span class="tf-note">Every screenshot in this entry is a frame of the game being played.</span>
+      </div>
+    </div>
     <div id="title-portraits"></div>
   </div>
   <div id="title-hint">Enter to select · arrows to move</div>
@@ -509,6 +567,7 @@
         <button class="btn" data-slot="2">SLOT 2</button>
         <button class="btn" data-slot="3">SLOT 3</button>
       </div></div>
+      <div class="panel side-block"><h4>STORY JOBS</h4><div id="pause-story-list"></div></div>
     </div>
     <div id="pause-center">
       <div id="pause-center-map"><canvas id="map-canvas" width="640" height="560"></canvas></div>
