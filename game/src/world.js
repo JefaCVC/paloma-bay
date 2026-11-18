@@ -348,11 +348,7 @@ export function buildWorld() {
   bd.quad([CITY.x0, 0, CITY.z0], [CITY.x1, 0, CITY.z0], [CITY.x1, 0, BEACH_Z], [CITY.x0, 0, BEACH_Z]);
   bd.setColor(0.85, 0.78, 0.58); // sand
   bd.quad([CITY.x0, 0.01, BEACH_Z], [CITY.x1, 0.01, BEACH_Z], [CITY.x1, 0.01, WATER_Z], [CITY.x0, 0.01, WATER_Z]);
-  bd.setColor(0.45, 0.48, 0.35); // island ground (ellipse-ish slab)
-  bd.disc([ISLAND.cx, 0.02, ISLAND.cz], [0, 1, 0], 1, 28);
-  // Island disc is unit radius — scale via a second pass: rebuild as ellipse quads.
-  // (disc above is a placeholder circle at r=1; the island slab follows.)
-  bd.setColor(0.45, 0.48, 0.35);
+  bd.setColor(0.45, 0.48, 0.35); // island ground (rectangular slab)
   bd.quad(
     [ISLAND.cx - ISLAND.rx, 0.02, ISLAND.cz - ISLAND.rz],
     [ISLAND.cx + ISLAND.rx, 0.02, ISLAND.cz - ISLAND.rz],
