@@ -74,7 +74,12 @@ export function createInput() {
 
 export function requestPointerLock(canvas) {
   try {
-    if (canvas.requestPointerLock) canvas.requestPointerLock();
+    if (canvas.requestPointerLock) {
+      // Modern Chrome returns a promise: a sync try/catch cannot catch its
+      // async rejection (e.g. WrongDocumentError when the tab is unfocused).
+      const p = canvas.requestPointerLock();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
   } catch (e) {
     // Pointer lock is a nicety, not a requirement.
   }
