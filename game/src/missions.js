@@ -6,7 +6,7 @@
 // is the story; the state machine below it just walks the table. All names
 // and story are original to this game.
 
-import { POI } from './world.js';
+import { POI } from './citydata.js';
 
 // Stage types:
 //   driveTo  — reach a marker (any way you like), radius 6

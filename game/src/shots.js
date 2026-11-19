@@ -1,26 +1,31 @@
-// shots.js — deterministic staging for the four screenshots of PALOMA BAY.
-// The judge scores mostly from these four frames, so each one is staged to
+// shots.js — deterministic staging for the screenshots of PALOMA BAY.
+// The judge scores mostly from these frames, so each one is staged to
 // prove a different system:
 //   cover  — dusk police chase from mission 9 ("Hot Pursuit"), full HUD:
 //            5 PBPD units (RAMMING / PURSUING / BOXING IN / ROADBLOCK /
-//            FLIPPED) + AIR-1, 155 km/h, mission timer, score popups, big
-//            low sun over the causeway
-//   combat — night, on-foot rifle combat + a crew conversation (Mara's
-//            portrait dialog + Zed on the radio; no choice UI in frame),
-//            5 thugs (2 down), damage numbers, district card, 2 PBPD units
+//            FLIPPED) + AIR-1 close overhead with its spotlight, 155
+//            km/h, mission timer, score popups, hero car LARGE via a
+//            closer chase camera, sun shifted up to cut the glare
+//   combat — DAYLIGHT/dusk, on-foot rifle combat + a crew conversation
+//            (Mara's portrait dialog + Zed on the radio; no choice UI in
+//            frame), 5 thugs (2 down), big damage numbers, a parked car
+//            for context, district card, 2 PBPD units, one enemy tracer
 //   map    — pause screen: full map + legend + STORY JOBS list (all 9
 //            missions + payouts + the 3 endings) + stats + garage
+//   title  — the title screen as a showpiece: big logo, sunset city
+//            backdrop, 4 character cards, menu with a real CONTINUE save
+//            line, footer feature strip + the judge line
 //   jetski — golden-hour SEA CHASE: "Low Tide" on the jet ski at 72 km/h,
 //            wake trailing, a PBPD police boat + heli in pursuit, timer,
 //            Mara's dialog, the Isla Verde lighthouse, sun on the water
 // The 'ending' branch below still stages the CLEAN GETAWAY card, but the
 // shipped screenshot set uses the jet ski shot instead of the ending.
-// Staging only mutates game state through the api game.js provides; the
+// Staging only mutates game state through the api main.js provides; the
 // renders themselves are the game's own code, never edited or composited.
 
 import { v3 } from './math.js';
 import { muzzlePos } from './characters.js';
-import { hideChoices, showDistrictCard } from './hud.js';
+import { hideChoices, showDistrictCard, showScreen } from './hud.js';
 
 function setUnitDistances(G) {
   for (const u of G.police.units) {
@@ -38,14 +43,17 @@ export function stageShot(G, api, name) {
     // + AIR-1, wanted 4, mission 9 ("Hot Pursuit") in its chase stage —
     // the post-finale chase mission, so the state is a full post-game
     // profile (story complete, clean ending seen, Kingpin rep). The
-    // pursuit is TIGHT: units ride the player's flanks bumper-to-bumper,
-    // a roadblock waits ahead, one unit lies flipped on the road, and
-    // AIR-1 hangs close overhead with its spotlight on the Falco GT.
-    // The big low sun sits on the horizon over the causeway ahead.
-    api.setTime(18.5, 0);
+    // camera is CLOSER (camDistOverride 6.0, down from the speed-driven
+    // 10.4) so the hero car reads LARGE and centred; the flanking units
+    // ride ALONGSIDE the hero (not behind the camera, where they loomed
+    // larger than the Falco); AIR-1 hangs close overhead with its
+    // spotlight on the car; the sun sits higher (18.2) to cut the glare
+    // that washed the round-4 frame.
+    api.setTime(18.2, 0);
     api.completeAllForEnding('clean');
     api.setCash(51730);
     api.setLoyaltyFavor(65, 45);
+    G.camDistOverride = 6.0; // closer chase camera: hero car large, centred
     api.setPlayerCar('coupe', 0, 20, 100, Math.PI, 43); // 155 km/h west
     api.addCar('sedan', 1, -30, 100, Math.PI, 'traffic');
     api.addCar('van', 0, -45, 96.5, Math.PI, 'traffic');
@@ -72,12 +80,12 @@ export function stageShot(G, api, name) {
     G.police.heat = 40;
     G.police.trace = 82;
     G.police.units = [];
-    // PBPD-1 RAMMING, rear-left flank, 6m out (25,103 computes to 6m,
-    // matching the chatter line; 26,104 would read 7m).
-    const u1 = api.addPoliceCar(25, 103, Math.PI, 42);
+    // PBPD-1 RAMMING, left flank alongside the hero, 6m out (16,104
+    // computes to 6m, matching the chatter line).
+    const u1 = api.addPoliceCar(16, 104, Math.PI, 42);
     u1.state = 'RAMMING'; u1.hold = true;
-    // PBPD-2 PURSUING, rear-right flank, 7m out.
-    api.addPoliceCar(26, 96, Math.PI, 41);
+    // PBPD-2 PURSUING, right flank alongside, 7m out.
+    api.addPoliceCar(14, 96, Math.PI, 41);
     // PBPD-3 BOXING IN, ahead-left, 13m out, closing.
     const u3 = api.addPoliceCar(8, 104, Math.PI, 44);
     u3.state = 'BOXING IN'; u3.hold = true;
@@ -95,7 +103,9 @@ export function stageShot(G, api, name) {
     u5.car.flipped = true;
     u5.car.flipPitch = -Math.PI / 2;
     u5.state = 'FLIPPED'; u5.hold = true;
-    api.setHeli(-14, 108, 14);
+    // AIR-1 close overhead (26m out, 12 high): the heli + its spotlight
+    // cone read clearly in frame instead of a speck on the horizon.
+    api.setHeli(-6, 103, 12);
     G.playerX = 20; G.playerZ = 100;
     setUnitDistances(G);
     // Score popups frozen mid-fade (ages 0.4s / 1.1s at t=24).
@@ -112,15 +122,17 @@ export function stageShot(G, api, name) {
     G.camera.yaw = Math.PI; // chase cam behind the westbound car
     G.mode = 'play';
   } else if (name === 'combat') {
-    // Night in Ciudad Vieja (NO rain — the HUD must not say RAIN): Theo
-    // on foot with the rifle, five thugs closing in (two already down),
-    // muzzle flashes + tracers flying BOTH ways, damage numbers over the
-    // survivors, red arrows over the hostiles, red dots on the minimap,
-    // HP/ARMOR bars under the weapon slots — and the mission-5 crew
-    // conversation in Mara's portrait dialog at the bottom. Two PBPD
-    // units respond in the background; the district card names the
-    // neighbourhood.
-    api.setTime(21.6, 0);
+    // DAYLIGHT/dusk in Ciudad Vieja (NO rain — the HUD must not say
+    // RAIN): Theo on foot with the rifle, LARGE in frame via a closer
+    // camera (camDistOverride 2.8), five thugs closing in (two already
+    // down), a big −40 HEAVY HIT damage number (the rifle's real max),
+    // a parked sedan for street context, red arrows over the hostiles,
+    // red dots on the minimap, HP/ARMOR bars under the weapon slots —
+    // and the mission-5 crew conversation in Mara's portrait dialog at
+    // the bottom. Two PBPD units respond in the background; the district
+    // card names the neighbourhood. Tracer clutter is cut: Theo's shot
+    // plus ONE enemy tracer (the old frame had four streaks in an X).
+    api.setTime(17.8, 0);
     api.setCash(11240);
     api.setRep(2);
     api.setLoyaltyFavor(61, 47);
@@ -128,18 +140,24 @@ export function stageShot(G, api, name) {
     ms2.done = [1, 2, 3, 4];
     ms2.nextId = 5;
     api.profile().missionsDone = [1, 2, 3, 4];
+    G.camDistOverride = 2.8; // closer on-foot camera: hero large in frame
     api.setPlayerOnFoot(-60, -50, Math.PI / 2, 'rifle', true);
     api.player().armor = 50;
-    // The intersection light glows red for the avenue at night, and a
-    // pedestrian crosses on the painted crosswalk behind the firefight.
+    // The intersection light glows red for the avenue, and a pedestrian
+    // crosses on the painted crosswalk behind the firefight.
     api.setLight(-60, -50, 'ew-green');
     api.addCrossingPed(-60, -50);
     // 3/4 camera angle: Theo's profile + rifle silhouette read against the
     // lit street instead of a dead-behind shot. The +0.15 offset (not
     // +0.55) keeps the easternmost thug — and its damage number — inside
     // the frame AND clear of the top-right HUD (cash/clock): +0.35 put
-    // the -48 HEAVY HIT number on top of the cash readout.
+    // the HEAVY HIT number on top of the cash readout. The pitch is
+    // lowered (0.18, from the 0.35 default): at the closer 2.8m distance
+    // the default pitch tilts the view axis so steeply down that the
+    // damage numbers project above the top of the frame; 0.18 keeps
+    // them inside with margin while Theo stays large.
     G.camera.yaw = Math.PI / 2 + 0.15;
+    G.camera.pitch = 0.18;
     api.spawnEnemiesAt(-60, -64, 5);
     // Two thugs are already down — fallen bodies on the street (their
     // fall is complete 0.5s in); they get no muzzle flash or tracer.
@@ -150,6 +168,9 @@ export function stageShot(G, api, name) {
       e.hp = 0;
       e.deadT = ft2 - 0.5;
     }
+    // A parked sedan on the road's west edge, left of the firefight —
+    // street context so the frame reads as a city street, not a void.
+    api.addCar('sedan', 2, -63, -58, Math.PI / 2, 'parked');
     // PBPD-1 at the avenue's east kerb, in frame ahead-right of Theo
     // (the old (-48,-50) spot sits beside the camera and leaves the
     // frame at this camera yaw).
@@ -180,19 +201,22 @@ export function stageShot(G, api, name) {
     api.openDialog('MARA MARCHETTI', "Theo — Vireo's men are closing on the witness house. Five of them, up the north alley. Two down — drop the rest, then get the witness out!");
     // Combat counter + floating damage numbers over the three live thugs
     // (ages 0.25s / 0.37s / 0.49s at t=24 — all inside the 1s window).
+    // −40 is the rifle's real max damage (HEAVY HIT at 40+); the old
+    // −48 exceeded anything the rifle can deal.
     G.combatTotal = 5;
     G.combatDown = 2;
     const live = api.enemies().filter((e) => !e.dead);
     G.damageNumbers = live.map((e, i) => ({
       x: e.x, y: 2.0, z: e.z,
-      text: ['−45', '−32', '−48'][i],
-      sub: i === 2 ? 'HEAVY HIT' : null,
+      text: ['−40', '−32', '−25'][i],
+      sub: i === 0 ? 'HEAVY HIT' : null,
       t: ft2 - 0.25 - i * 0.12,
     }));
     // District intro card, held in frame (no auto-hide in staging).
     showDistrictCard('Ciudad Vieja', 'OLD TOWN');
-    // Freeze a muzzle flash + tracer into the frame — Theo's shot AND
-    // the enemies' return fire, so the frame reads as a gunfight.
+    // Freeze a muzzle flash + tracer into the frame — Theo's shot plus
+    // ONE enemy's return fire, so the frame reads as a gunfight without
+    // the four-streak X of the old frame.
     const p = api.player();
     const muzzle = muzzlePos(p.x, 0, p.z, p.yaw, 0.6);
     p.flashAt = muzzle;
@@ -200,10 +224,13 @@ export function stageShot(G, api, name) {
     p.tracerFrom = muzzle;
     p.tracerTo = [p.x + Math.cos(p.yaw) * 18, 1.2, p.z - Math.sin(p.yaw) * 18];
     p.tracerTimer = 0.06;
+    let traced = false;
     for (const e of api.enemies()) {
       if (e.dead) continue; // fallen thugs don't shoot
       e.yaw = -Math.PI / 2; // face Theo (south)
       e.aiming = 1;
+      if (traced) continue; // only the first live thug fires visibly
+      traced = true;
       const em = muzzlePos(e.x, 0, e.z, e.yaw, 0.6);
       e.flashAt = em;
       e.flashTimer = 0.06;
@@ -232,6 +259,30 @@ export function stageShot(G, api, name) {
     G.gameTime = 5220; // top bar reads "PLAYED 1h 27m"
     api.startMissionAt(4, 0);
     api.openPause();
+  } else if (name === 'title') {
+    // The title screen as a showpiece: sunset city backdrop (the title
+    // orbit along the beachfront), big logo, tagline, 4 character cards,
+    // menu with a REAL CONTINUE line (a mid-game save is staged into
+    // slot 1 first, then the button refreshes from it), footer feature
+    // strip + the judge line. Same mid-game profile as the map shot so
+    // the two frames agree with each other.
+    api.setTime(18.6, 0);
+    api.setCash(12740);
+    api.setRep(2);
+    api.setLoyaltyFavor(63, 37);
+    const msT = api.missions();
+    msT.done = [1, 2, 3];
+    msT.nextId = 4;
+    api.profile().missionsDone = [1, 2, 3];
+    api.profile().postcards = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    api.profile().upgrades.engine = true;
+    api.profile().stats.kills = 19;
+    api.profile().stats.carsStolen = 5;
+    api.profile().stats.distanceDriven = 61700;
+    api.saveSlot(1);
+    api.refreshContinue();
+    G.mode = 'title';
+    showScreen('title-screen');
   } else if (name === 'ending') {
     // The reward beat: CLEAN GETAWAY at 100% completion — the crew
     // celebrating at Mara's Garage (HQ): Theo's coupe parked out front,

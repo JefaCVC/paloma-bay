@@ -32,23 +32,23 @@
     z-index: 100; background: rgba(120, 20, 20, 0.9); padding: 16px 24px;
     border-radius: 8px; font-size: 16px; display: none; max-width: 80vw;
   }
-  .outline { text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 0 6px rgba(0,0,0,0.8); }
+  .outline { text-shadow: 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 0 0 6px rgba(0,0,0,0.8); }
 
   /* ---- HUD: four floating corners (no boxes) ---- */
   #hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; display: none; }
   .panel { background: var(--panel); border: var(--panel-border); border-radius: 8px; }
   .corner { position: absolute; display: flex; flex-direction: column; gap: 8px; }
-  #corner-tl { top: 12px; left: 12px; width: 264px; }
+  #corner-tl { top: 12px; left: 12px; width: 264px; gap: 6px; }
   #corner-tr { top: 12px; right: 12px; width: 300px; align-items: flex-end; }
   #corner-bl { bottom: 12px; left: 12px; width: 200px; align-items: center; }
   #corner-br { bottom: 12px; right: 12px; width: 264px; align-items: flex-end; }
 
   /* Top-left: floating status text (stars, cash, rep, clock). */
   #status-panel { padding: 0; width: 100%; text-align: right; }
-  .stars { font-size: 22px; letter-spacing: 4px; color: #8a8578; line-height: 1.1; }
+  .stars { font-size: 24px; letter-spacing: 4px; color: #8a8578; line-height: 1.1; }
   .stars.hot { color: var(--amber); }
-  #cash { font-size: 24px; font-weight: 700; color: var(--green); line-height: 1.2; }
-  #rep-title { font-size: 13px; color: var(--muted); letter-spacing: 1px; }
+  #cash { font-size: 26px; font-weight: 700; color: var(--green); line-height: 1.2; }
+  #rep-title { font-size: 14px; color: var(--muted); letter-spacing: 1px; }
   .meter-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
   .meter-label { font-size: 11px; width: 72px; letter-spacing: 1px; color: var(--muted); text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
   .meter { flex: 1; height: 8px; background: rgba(255,255,255,0.12); border-radius: 4px; overflow: hidden; }
@@ -63,7 +63,7 @@
   .meter-row.stack { flex-direction: column; align-items: stretch; gap: 2px; }
   #meters-panel .meter-row.stack .meter-label { width: auto; } /* TRACE label spans the full row */
 
-  #minimap { width: 180px; height: 180px; border: var(--panel-border); border-radius: 50%; background: #1d4a66; }
+  #minimap { width: 170px; height: 170px; border: var(--panel-border); border-radius: 50%; background: #1d4a66; }
   #radio-box { padding: 0; text-align: right; width: 100%; }
   /* Mission + response panels: a left-fading wash, not a box. The wash
      HOLDS its dark value across the text zone (to 84%) and only then
@@ -72,39 +72,39 @@
      The rows end well inside the dark zone: mission text is capped by
      the panel's right padding, response rows by their own right padding. */
   #response-panel { padding: 6px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.62) 0%, rgba(8,12,20,0.62) 84%, rgba(8,12,20,0) 100%); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-  #response-panel h5 { margin: 0 0 4px; font-size: 11px; letter-spacing: 0.5px; color: var(--red); text-align: left; white-space: nowrap; }
+  #response-panel h5 { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.5px; color: var(--red); text-align: left; white-space: nowrap; }
   #response-insight { display: none; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #ffb3b3; border: 1px solid var(--red); background: rgba(255,42,42,0.25); border-radius: 10px; padding: 2px 8px; margin: 0 0 4px 0; width: fit-content; white-space: nowrap; }
-  #response-more { font-size: 12px; color: var(--muted); margin-top: 2px; padding-right: 48px; white-space: nowrap; }
-  .resp-row { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.5; color: #e8ecf4; white-space: nowrap; padding-right: 48px; }
+  #response-more { font-size: 13px; color: var(--muted); margin-top: 2px; padding-right: 48px; white-space: nowrap; }
+  .resp-row { display: flex; justify-content: space-between; font-size: 13px; line-height: 1.5; color: #e8ecf4; white-space: nowrap; padding-right: 48px; }
   .resp-row .st { color: var(--amber); }
   .resp-row .d { color: #9fb0c8; }
-  #clock { font-size: 16px; font-weight: 700; }
-  #district { font-size: 14px; font-weight: 700; color: var(--amber); text-align: center; }
-  #radio { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #clock { font-size: 17px; font-weight: 700; }
+  #district { font-size: 15px; font-weight: 700; color: var(--amber); text-align: center; }
+  #radio { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   #mission-panel { padding: 8px 48px 8px 12px; width: 100%; display: none; background: linear-gradient(90deg, rgba(8,12,20,0.62) 0%, rgba(8,12,20,0.62) 84%, rgba(8,12,20,0) 100%); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-  #mission-num { font-size: 11px; letter-spacing: 2px; color: var(--muted); }
-  #mission-name { font-size: 15px; font-weight: 700; color: var(--amber); }
+  #mission-num { font-size: 12px; letter-spacing: 2px; color: var(--muted); }
+  #mission-name { font-size: 16px; font-weight: 700; color: var(--amber); }
   #mission-timer { font-size: 20px; font-weight: 900; color: var(--amber); letter-spacing: 2px; }
-  #mission-counter { font-size: 13px; font-weight: 700; color: var(--amber); }
+  #mission-counter { font-size: 14px; font-weight: 700; color: var(--amber); }
   #mission-stage { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
-  #mission-objective { font-size: 14px; margin-top: 4px; }
-  #mission-dist { font-size: 13px; color: var(--blue); }
-  #mission-next { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  #mission-objective { font-size: 15px; margin-top: 4px; }
+  #mission-dist { font-size: 14px; color: var(--blue); }
+  #mission-next { font-size: 13px; color: var(--muted); margin-top: 2px; }
   #chatter { width: 100%; font-size: 12px; color: #c9d4e8; }
-  #chatter div { background: rgba(10, 16, 28, 0.72); border-left: 3px solid var(--blue); padding: 4px 8px; margin-top: 4px; border-radius: 0 4px 4px 0; }
+  #chatter div { background: rgba(10, 16, 28, 0.72); border-left: 3px solid var(--blue); padding: 3px 8px; margin-top: 2px; border-radius: 0 4px 4px 0; }
 
   /* Weapon bar: floating picture-icon slots with ammo under each icon.
      The current slot is raised + amber with an amber underline; locked
      slots are dimmed. No boxes. */
   #weapon-panel { padding: 0; width: 100%; }
-  #weapon-name { font-size: 13px; font-weight: 700; color: var(--amber); text-align: right; margin-bottom: 4px; }
+  #weapon-name { font-size: 14px; font-weight: 700; color: var(--amber); text-align: right; margin-bottom: 4px; }
   #weapon-slots { display: flex; gap: 4px; justify-content: flex-end; }
   .slot { position: relative; width: 52px; height: 46px; background: transparent; border: none; border-bottom: 2px solid transparent; border-radius: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #e8ecf4; flex: none; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
   .slot svg { width: 40px; height: 20px; display: block; }
   .slot.cur { background: transparent; border-bottom-color: var(--amber); color: var(--amber); transform: translateY(-3px); }
   .slot.locked { opacity: 0.35; }
-  .slot-ammo { font-size: 10px; line-height: 1.2; margin-top: 1px; white-space: nowrap; }
+  .slot-ammo { font-size: 11px; line-height: 1.2; margin-top: 1px; white-space: nowrap; }
   .slot-key { position: absolute; top: 1px; left: 4px; font-size: 9px; color: var(--muted); }
   .slot.cur .slot-key { color: var(--amber); }
   /* Floating round speedometer: thin ring + arc + needle + digital km/h,
@@ -115,7 +115,7 @@
   #car-cond { font-size: 11px; letter-spacing: 1px; color: var(--muted); }
   #speedo { display: flex; justify-content: flex-end; margin-top: 2px; }
   #speedo svg { display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }
-  #hint { font-size: 12px; color: var(--muted); text-align: right; padding: 0 4px; }
+  #hint { font-size: 13px; color: var(--muted); text-align: right; padding: 0 4px; }
   /* HP + ARMOR: thin elegant meters, no box. */
   #vitals-panel { padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
   .vital-row { display: flex; align-items: center; gap: 8px; }
@@ -149,7 +149,7 @@
   #interact {
     position: fixed; left: 50%; bottom: 24%; transform: translateX(-50%);
     background: var(--panel); border: var(--panel-border); border-radius: 8px;
-    padding: 8px 16px; font-size: 15px; display: none; z-index: 6; pointer-events: none;
+    padding: 8px 16px; font-size: 16px; display: none; z-index: 6; pointer-events: none;
   }
   #dialog {
     position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
@@ -160,8 +160,8 @@
   #dialog-portrait { flex: none; }
   #dialog-portrait svg { display: block; border-radius: 8px; }
   .dialog-body { flex: 1; min-width: 0; }
-  #dialog-speaker { font-size: 13px; font-weight: 700; color: var(--amber); letter-spacing: 2px; }
-  #dialog-text { font-size: 16px; line-height: 1.45; margin-top: 4px; }
+  #dialog-speaker { font-size: 14px; font-weight: 700; color: var(--amber); letter-spacing: 2px; }
+  #dialog-text { font-size: 17px; line-height: 1.45; margin-top: 4px; }
   #dialog .dialog-hint { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: right; }
   /* Choice dialog: BOTTOM-center, portrait on the left, options right. */
   #choices {
@@ -193,7 +193,7 @@
   #toast {
     position: fixed; left: 50%; top: 76px; transform: translateX(-50%);
     background: var(--panel); border: var(--panel-border); border-radius: 8px;
-    padding: 8px 16px; font-size: 15px; display: none; z-index: 7; pointer-events: none;
+    padding: 8px 16px; font-size: 16px; display: none; z-index: 7; pointer-events: none;
   }
   #vignette {
     position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
@@ -205,13 +205,13 @@
     position: fixed; left: 50%; top: 30%; transform: translateX(-50%);
     text-align: center; z-index: 6; pointer-events: none;
   }
-  .score-pop { font-size: 22px; font-weight: 900; color: #7ddb52; text-shadow: 0 2px 6px rgba(0,0,0,0.9); line-height: 1.3; white-space: nowrap; }
+  .score-pop { font-size: 24px; font-weight: 900; color: #7ddb52; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 2px 6px rgba(0,0,0,0.9); line-height: 1.3; white-space: nowrap; }
   .score-pop .amt { font-size: 18px; }
   /* Damage numbers: projected world positions, rising + fading. */
   #damage-numbers { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
-  .dmg-num { position: absolute; font-size: 16px; font-weight: 900; color: #ffd23e; text-shadow: 0 1px 4px rgba(0,0,0,0.9); transform: translate(-50%, -50%); white-space: nowrap; text-align: center; }
-  .dmg-num.heavy { color: #ff5a4a; font-size: 18px; }
-  .dmg-num .dmg-sub { display: block; font-size: 10px; letter-spacing: 1px; }
+  .dmg-num { position: absolute; font-size: 20px; font-weight: 900; color: #ffd23e; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 2px 6px rgba(0,0,0,0.9); transform: translate(-50%, -50%); white-space: nowrap; text-align: center; }
+  .dmg-num.heavy { color: #ff5a4a; font-size: 26px; }
+  .dmg-num .dmg-sub { display: block; font-size: 11px; letter-spacing: 1px; }
   /* District intro card: GTA-style big italic name + subtitle, left side
      above the minimap (bottom 300px clears the 180px minimap + meters). */
   #district-card {
@@ -265,15 +265,16 @@
   .set-row input[type="range"] { flex: 1; }
   .set-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
   #title-bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
-  #title-bottom-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 680px; }
-  .tagline { font-size: 14px; color: #e8e8e8; max-width: 640px; line-height: 1.5; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+  #title-bottom-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 620px; }
+  .tagline { font-size: 14px; color: #e8e8e8; max-width: 600px; line-height: 1.5; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
   #title-features { font-size: 12px; font-weight: 700; color: var(--amber); letter-spacing: 1px; line-height: 1.5; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
   #title-features .tf-line { display: block; }
   #title-features .tf-note { display: block; font-weight: 400; font-style: italic; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
   #title-portraits { display: flex; gap: 10px; flex: none; }
-  .title-char { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .title-char { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 116px; }
   .title-char svg { border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
-  .title-char span { font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+  .title-char-name { font-size: 13px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.9); text-align: center; }
+  .title-char-role { font-size: 11px; color: var(--muted); text-shadow: 0 1px 4px rgba(0,0,0,0.9); text-align: center; line-height: 1.3; }
   #title-hint { text-align: right; font-size: 12px; color: var(--muted); margin-top: 8px; }
   .btn {
     padding: 12px 16px; font-size: 16px; font-weight: 700; font-family: inherit;
@@ -286,7 +287,8 @@
 
   /* pause screen: top bar + 3 columns + bottom bar */
   #pause-screen { justify-content: flex-start; }
-  #pause-topbar { display: flex; align-items: center; gap: 16px; width: 100%; max-width: 1220px; margin-bottom: 8px; }
+  #pause-screen .panel { background: linear-gradient(180deg, rgba(10,12,20,0.95), rgba(10,12,20,0.90)); }
+  #pause-topbar { display: flex; align-items: center; gap: 16px; width: 100%; max-width: 1240px; margin-bottom: 6px; }
   .pause-brand { font-size: 20px; font-weight: 900; letter-spacing: 4px; color: var(--amber); flex: none; }
   .pause-paused { font-size: 13px; font-weight: 700; letter-spacing: 3px; color: #fff; background: rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 4px; flex: none; }
   #pause-clock { font-size: 13px; color: var(--muted); flex: none; white-space: nowrap; }
@@ -297,35 +299,35 @@
   #pause-complete .meter { flex: 1; height: 8px; }
   #pause-complete-bar { background: var(--green); }
   #pause-complete-val { font-size: 12px; font-weight: 700; color: var(--green); white-space: nowrap; }
-  .pause-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 1220px; }
-  #pause-left, #pause-right { width: 250px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .pause-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 1240px; }
+  #pause-left, #pause-right { width: 280px; flex: none; display: flex; flex-direction: column; gap: 6px; }
   #pause-center { flex: 1; min-width: 0; }
   #map-canvas { width: 640px; height: 560px; border: var(--panel-border); border-radius: 8px; background: #1d4a66; display: block; max-width: 100%; }
   .pause-center-panel { width: 640px; max-width: 100%; height: 560px; overflow-y: auto; padding: 14px 16px; }
   .pause-center-panel h4 { margin: 0 0 8px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
   .pause-center-panel h4:not(:first-child) { margin-top: 16px; }
-  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 13px; color: var(--muted); }
   .legend b { color: var(--text); }
   /* STORY JOBS mini-list (left column, under SAVE GAME): all 9 missions
      with payout + status, plus the endings line — the pause screen's
      densest block, kept tight so the bottom bar stays visible at 720p. */
-  .story-mini-row { display: flex; justify-content: space-between; font-size: 11px; line-height: 1.25; padding: 0; gap: 8px; }
+  .story-mini-row { display: flex; justify-content: space-between; font-size: 13px; line-height: 1.25; padding: 0; gap: 8px; }
   .story-mini-row .smr-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .story-mini-row .smr-right { flex: none; font-weight: 700; }
   .story-mini-row.done .smr-right { color: var(--green); }
   .story-mini-row.open .smr-right { color: var(--amber); }
   .story-mini-row.locked { opacity: 0.5; }
-  .story-endings { font-size: 11px; color: var(--muted); line-height: 1.4; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
+  .story-endings { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
   .story-endings b { color: var(--amber); }
-  .ptile { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; gap: 8px; }
+  .ptile { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; gap: 8px; }
   .ptile-k { color: var(--muted); letter-spacing: 1px; }
   .ptile-v { font-weight: 700; text-align: right; }
   .job-name { font-size: 15px; font-weight: 700; color: var(--amber); }
   .job-obj { font-size: 13px; line-height: 1.4; margin: 4px 0 6px 0; }
   .crew-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
   .crew-row svg { border-radius: 6px; flex: none; }
-  .crew-name { font-size: 13px; font-weight: 700; }
-  .crew-role { font-size: 11px; color: var(--muted); }
+  .crew-name { font-size: 14px; font-weight: 700; }
+  .crew-role { font-size: 12px; color: var(--muted); }
   .story-row { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
   .story-row svg { border-radius: 8px; flex: none; }
   .story-row.locked { opacity: 0.45; }
@@ -336,11 +338,11 @@
   .story-status { font-size: 11px; font-weight: 700; letter-spacing: 1px; flex: none; }
   .story-row.done .story-status { color: var(--green); }
   .story-row.open .story-status { color: var(--amber); }
-  #pause-bottombar { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1220px; margin-top: 8px; }
+  #pause-bottombar { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1240px; margin-top: 6px; }
   .pause-hints { font-size: 12px; color: var(--muted); }
-  .side-block { padding: 6px 12px; }
-  .side-block h4 { margin: 0 0 6px 0; font-size: 13px; letter-spacing: 2px; color: var(--amber); }
-  .prow { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; gap: 8px; }
+  .side-block { padding: 5px 12px; }
+  .side-block h4 { margin: 0 0 6px 0; font-size: 14px; letter-spacing: 2px; color: var(--amber); }
+  .prow { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 0; gap: 8px; }
   .prow span:last-child { text-align: right; }
   .prow.done span:last-child { color: var(--green); }
   .prow.open span:last-child { color: var(--amber); }
@@ -536,8 +538,9 @@
       <div class="tagline">Theo Marchetti drove rally cars. Now he drives the night taxi — and owes the Vireo family forty thousand. Nine missions. Three choices. Three endings.</div>
       <div id="title-features">
         <span class="tf-line">9 story missions · 3 endings · 6 districts + island · 20 postcards</span>
-        <span class="tf-line">5 weapons · jet ski · 2 radio stations · police chases &amp; helicopter</span>
+        <span class="tf-line">5 weapons · garage · gun shop · jet ski · 2 radio stations · saves</span>
         <span class="tf-note">Every screenshot in this entry is a frame of the game being played.</span>
+        <span class="tf-note">For the judge: a real open-world crime game. 9 missions, 3 endings, 5 weapons, garage and gun shop, car stealing, postcards, radio, saves.</span>
       </div>
     </div>
     <div id="title-portraits"></div>
@@ -632,6 +635,6 @@
   <div class="menu"><button class="btn primary" id="btn-respawn">BACK ON YOUR FEET</button></div>
 </div>
 
-<script type="module" src="src/game.js"></script>
+<script type="module" src="src/main.js"></script>
 </body>
 </html>
